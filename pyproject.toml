@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sopc2dts"
+dynamic = ["version"]
+description = "Devicetree generator for Intel/Altera FPGA systems — Python port of the original Java tool by Walter Goossens"
+readme = "README.md"
+license = { file = "COPYING" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Laurence", email = "laurence@anodes4life.com" },
+]
+keywords = ["fpga", "altera", "intel", "devicetree", "dts", "dtb", "quartus", "agilex"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Embedded Systems",
+]
+dependencies = []
+
+[project.optional-dependencies]
+gui = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
+dev = [
+    "pytest>=8",
+]
+
+[project.scripts]
+sopc2dts = "sopc2dts_py.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/LaurenceA4L/sopc2dts"
+"Bug Tracker" = "https://github.com/LaurenceA4L/sopc2dts/issues"
+"Buy Me a Coffee" = "https://buymeacoffee.com/lozhoma"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sopc2dts_py*"]
+
+[tool.setuptools_scm]
