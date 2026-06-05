@@ -25,11 +25,12 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 - [x] `logging` integration replacing `Logger` / `LogListener` / `LogEntry`
 - [x] Basic `argparse` CLI in `__main__.py` (all flags from `Sopc2DTS.java`)
 
-### Model layer (`sopc2dts/model/`)
-- [ ] `parameter.py` — `Parameter` dataclass (name, value, type)
-- [ ] `connection.py` — `Connection` dataclass (master iface → slave iface)
-- [ ] `component.py` — `BasicComponent`, `Interface`, `MemoryBlock`, `InterruptReceiver`
-- [ ] `system.py` — `AvalonSystem` (component registry, master/slave lookups, bridge removal)
+### Model layer (`sopc2dts_py/model/`)
+- [x] `parameter.py` — `Parameter` dataclass (name, value, type)
+- [x] `connection.py` — `Connection` dataclass (master iface → slave iface)
+- [x] `component.py` — `BasicComponent`, `Interface`, `MemoryBlock`, `SopcComponentDescription`
+- [x] `system.py` — `AvalonSystem` (component registry, master/slave lookups)
+- [x] `enums.py` — `SystemDataType`, `ParameterAction` (added to avoid circular imports)
 - [ ] `boardinfo.py` — `BoardInfo` + boardinfo XML components (Ethernet, I2C, SPI, Flash, DTAppend)
 - [ ] `devicetree.py` — `DTNode`, `DTProperty`, `DTPropVal` subtypes, `DTBlob`
 - [ ] `component_lib.py` — `SopcComponentLib` equivalent (XML-driven component registry)
