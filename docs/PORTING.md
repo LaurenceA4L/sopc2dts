@@ -20,10 +20,10 @@ I will tick the boxes off as each item lands on `main`.
 Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 
 ### Project skeleton
-- [ ] `pyproject.toml` with `[project]` metadata, `scripts = {sopc2dts = "sopc2dts.__main__:main"}`
-- [ ] Package layout: `sopc2dts/{model,parsers,components,generators,gui}/`
-- [ ] `logging` integration replacing `Logger` / `LogListener` / `LogEntry`
-- [ ] Basic `argparse` CLI in `__main__.py` (all flags from `Sopc2DTS.java`)
+- [x] `pyproject.toml` with `[project]` metadata, `scripts = {sopc2dts = "sopc2dts.__main__:main"}`
+- [x] Package layout: `sopc2dts_py/{model,parsers,components,generators,gui}/`
+- [x] `logging` integration replacing `Logger` / `LogListener` / `LogEntry`
+- [x] Basic `argparse` CLI in `__main__.py` (all flags from `Sopc2DTS.java`)
 
 ### Model layer (`sopc2dts/model/`)
 - [ ] `parameter.py` — `Parameter` dataclass (name, value, type)
