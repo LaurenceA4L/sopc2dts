@@ -1,0 +1,23 @@
+sopc2dts
+========
+
+This project is a Python port and modernisation of the original sopc2dts tool.
+
+Original work
+-------------
+  sopc2dts - Devicetree generation for Altera systems
+  Copyright (C) 2011-2015 Walter Goossens <waltergoossens@home.nl>
+  Licensed under the GNU Lesser General Public License v2.1 or later.
+  Source: https://github.com/altera-opensource/sopc2dts (cloned upstream)
+          https://github.com/wgoossens/sopc2dts (original author's repo)
+
+Python port
+-----------
+  Copyright (C) 2026 Laurence <laurence@anodes4life.com>
+
+This derivative work is redistributed under the GNU General Public License v3
+or later, in accordance with Section 3 of the GNU Lesser General Public
+License v2.1, which permits conversion to the ordinary GNU General Public
+License.
+
+The full license text is in the COPYING file in this repository.
