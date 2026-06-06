@@ -15,6 +15,24 @@ I will tick the boxes off as each item lands on `main`.
 
 ---
 
+## Known Porting Deviations
+
+Places where the Python port intentionally does *not* replicate Java
+behaviour, because that behaviour was a bug rather than a design choice.
+Each entry should explain what the Java code actually did and why the fix
+is safe.
+
+- **`SpiSlave` cpol/cpha/csHigh always False** — `boardinfo.py`. The Java
+  constructor read these via `Boolean.getBoolean(atts.getValue("cpol"))`.
+  `Boolean.getBoolean` doesn't parse its argument — it looks up a *JVM
+  system property* of that name — so for a normal XML attribute value it
+  always returns `false`. These flags were therefore permanently stuck at
+  `False` in the Java tool no matter what the boardinfo file said. The
+  Python port (`_parse_bool` in `boardinfo.py`) parses `"true"/"false"`
+  attribute values properly.
+
+---
+
 ## Phase 1 — Core Model + Parsers (CLI parity)
 
 Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
