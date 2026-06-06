@@ -9,36 +9,43 @@
 # (at your option) any later version.
 
 """
-Port of sopc2dts.parsers.sopcinfo.SopcInfoSystemLoader (and its helpers
-SopcInfoComponent, SopcInfoInterface, SopcInfoConnection,
-SopcInfoAssignment, SopcInfoParameter).
+Port of sopc2dts.parsers.sopcinfo.SopcInfoSystemLoader (and helpers).
 
-The Java implementation used SAX with a ContentHandler-swapping pattern
-(each element redirected the XMLReader to a fresh handler).  Here we
-parse the whole tree with ElementTree and walk it once, producing the
-same data model.
+The Java implementation used SAX with ContentHandler-swapping.  Here we
+parse the whole tree with ElementTree and walk it once.
 
-Sopcinfo XML structure
-----------------------
-<EnsembleReport name="..." quartusVersion="...">
+Real sopcinfo XML structure
+---------------------------
+<EnsembleReport name="..." version="13.1">
+    <reportVersion>13.1</reportVersion>          <!-- optional override -->
     <module name="uart_0" kind="altera_avalon_uart" version="13.0">
-        <parameter name="clockRate" value="50000000"/>
-        <assignment name="embeddedsw.CMacro.BAUD" value="115200"/>
         <interface name="s1" kind="avalon_slave" direction="end">
-            <parameter name="addressableSize" value="32"/>
-            <assignment .../>
+            <parameter name="addressSpan" value="32"/>
+        </interface>
+        <interface name="clk" kind="clock_source" direction="start">
+            <parameter name="clockRate" value="50000000"/>
         </interface>
         <interface name="irq" kind="interrupt_sender" direction="start"/>
     </module>
-    ...
-    <connection kind="avalon" version="13.0"
-                start="cpu_0.data_master" end="uart_0.s1">
+    <!-- Connections route via TEXT child elements, NOT start=/end= attrs -->
+    <connection kind="avalon" version="13.0">
+        <startModule>cpu_0</startModule>
+        <startConnectionPoint>data_master</startConnectionPoint>
+        <endModule>uart_0</endModule>
+        <endConnectionPoint>s1</endConnectionPoint>
         <parameter name="baseAddress" value="0x00000100"/>
     </connection>
-    <connection kind="clock" ...  start="clk_0.clk" end="uart_0.clk">
-        <parameter name="clockRate" value="50000000"/>
+    <connection kind="clock" version="13.0">
+        <startModule>clk_0</startModule>
+        <startConnectionPoint>clk</startConnectionPoint>
+        <endModule>uart_0</endModule>
+        <endConnectionPoint>clk</endConnectionPoint>
     </connection>
-    <connection kind="interrupt" ... start="cpu_0.d32" end="uart_0.irq">
+    <connection kind="interrupt" version="13.0">
+        <startModule>uart_0</startModule>
+        <startConnectionPoint>irq</startConnectionPoint>
+        <endModule>cpu_0</endModule>
+        <endConnectionPoint>d32</endConnectionPoint>
         <parameter name="irqNumber" value="0"/>
     </connection>
 </EnsembleReport>
@@ -60,63 +67,71 @@ from ..model.parameter import DataType, Parameter
 from ..model.system import AvalonSystem
 
 # ---------------------------------------------------------------------------
-# Interface kind → (SystemDataType, is_master) mapping
-# Mirrors SopcInfoInterface.startElement kind dispatch in Java.
+# Interface kind map  (mirrors SopcInfoInterface.setKind in Java)
 # ---------------------------------------------------------------------------
 
 _INTF_KIND_MAP: dict[str, Tuple[SystemDataType, bool]] = {
+    # Memory-mapped masters
     "avalon_master":                    (SystemDataType.MEMORY_MAPPED,       True),
+    "avalon_tristate_master":           (SystemDataType.MEMORY_MAPPED,       True),
+    "tristate_conduit_master":          (SystemDataType.MEMORY_MAPPED,       True),
+    "altera_axi_master":                (SystemDataType.MEMORY_MAPPED,       True),
+    "altera_axi4_master":               (SystemDataType.MEMORY_MAPPED,       True),
+    "apb_master":                       (SystemDataType.MEMORY_MAPPED,       True),
+    "axi4_master":                      (SystemDataType.MEMORY_MAPPED,       True),
+    "axi4lite_master":                  (SystemDataType.MEMORY_MAPPED,       True),
+    # Memory-mapped slaves
     "avalon_slave":                     (SystemDataType.MEMORY_MAPPED,       False),
-    "interrupt_sender":                 (SystemDataType.INTERRUPT,            True),
-    "interrupt_receiver":               (SystemDataType.INTERRUPT,            False),
+    "avalon_tristate_slave":            (SystemDataType.MEMORY_MAPPED,       False),
+    "tristate_conduit_slave":           (SystemDataType.MEMORY_MAPPED,       False),
+    "altera_axi_slave":                 (SystemDataType.MEMORY_MAPPED,       False),
+    "altera_axi4_slave":                (SystemDataType.MEMORY_MAPPED,       False),
+    "altera_axi4lite_slave":            (SystemDataType.MEMORY_MAPPED,       False),
+    "axi4_slave":                       (SystemDataType.MEMORY_MAPPED,       False),
+    "axi4lite_slave":                   (SystemDataType.MEMORY_MAPPED,       False),
+    "apb_slave":                        (SystemDataType.MEMORY_MAPPED,       False),
+    "ahb_slave":                        (SystemDataType.MEMORY_MAPPED,       False),
+    # Interrupts: Java interrupt_receiver->isMaster=True, sender->False
+    "interrupt_sender":                 (SystemDataType.INTERRUPT,            False),
+    "interrupt_receiver":               (SystemDataType.INTERRUPT,            True),
+    # Clock
     "clock_source":                     (SystemDataType.CLOCK,                True),
     "clock_sink":                       (SystemDataType.CLOCK,                False),
+    # Reset
     "reset_source":                     (SystemDataType.RESET,                True),
     "reset_sink":                       (SystemDataType.RESET,                False),
+    # Streaming
     "avalon_streaming_source":          (SystemDataType.STREAMING,            True),
     "avalon_streaming_sink":            (SystemDataType.STREAMING,            False),
+    # Custom instruction
     "nios_custom_instruction_master":   (SystemDataType.CUSTOM_INSTRUCTION,   True),
     "nios_custom_instruction_slave":    (SystemDataType.CUSTOM_INSTRUCTION,   False),
-    # conduit_end direction is resolved from the XML "direction" attribute
-    "conduit_end":                      (SystemDataType.CONDUIT,              False),  # placeholder
-    "conduit_master":                   (SystemDataType.CONDUIT,              True),
-    "conduit_slave":                    (SystemDataType.CONDUIT,              False),
+    # Conduit: all variants -> isMaster=False per Java
+    "conduit":                          (SystemDataType.CONDUIT,              False),
+    "conduit_start":                    (SystemDataType.CONDUIT,              False),
+    "conduit_end":                      (SystemDataType.CONDUIT,              False),
 }
 
-# Connection kind → SystemDataType
+# Connection kind map  (None = skip, no DTS output)
 _CONN_KIND_MAP: dict[str, Optional[SystemDataType]] = {
     "avalon":            SystemDataType.MEMORY_MAPPED,
+    "avalon_tristate":   SystemDataType.MEMORY_MAPPED,
+    "tristate_conduit":  SystemDataType.MEMORY_MAPPED,
     "clock":             SystemDataType.CLOCK,
     "interrupt":         SystemDataType.INTERRUPT,
-    "reset":             None,   # explicitly ignored (no DTS output)
+    "reset":             None,
     "avalon_streaming":  SystemDataType.STREAMING,
     "conduit":           SystemDataType.CONDUIT,
 }
 
-# Regex to strip C-literal integer suffixes: u, ul, ull, UL, ULL, etc.
 _C_SUFFIX_RE = re.compile(r'[uU][lL]{0,2}$')
 
 
-# ---------------------------------------------------------------------------
-# Low-level value helpers
-# ---------------------------------------------------------------------------
-
 def _strip_c_suffix(value: str) -> str:
-    """Remove trailing C integer literal suffix (u/ul/ull and variants)."""
     return _C_SUFFIX_RE.sub("", value.strip())
 
 
 def _infer_type(raw: str) -> DataType:
-    """
-    Infer DataType from a raw string value — mirrors SopcInfoAssignment type
-    inference logic (no explicit <type> element present).
-
-    Rules (in order):
-      empty string → BOOLEAN
-      starts with 0x / 0X → NUMBER
-      all digits (after suffix strip) → NUMBER
-      otherwise → STRING
-    """
     v = _strip_c_suffix(raw)
     if not v:
         return DataType.BOOLEAN
@@ -130,312 +145,213 @@ def _infer_type(raw: str) -> DataType:
 
 
 def _coerce_value(raw: str, dt: DataType) -> str:
-    """
-    Normalise the value string for storage in a Parameter.
-    For NUMBER types, strip the C suffix so int(..., 0) works later.
-    """
     if dt == DataType.NUMBER:
         return _strip_c_suffix(raw)
     return raw
 
 
-# ---------------------------------------------------------------------------
-# Parameter / assignment parsing
-# ---------------------------------------------------------------------------
-
 def _parse_param_elem(elem: ET.Element) -> Optional[Parameter]:
-    """
-    Parse a <parameter> or <assignment> element into a Parameter.
-
-    Both formats are supported:
-      Attribute form:  <parameter name="foo" value="bar"/>
-      Element form:    <parameter>
-                           <name>foo</name>
-                           <value>bar</value>
-                           <type>NUMBER</type>   <!-- optional -->
-                       </parameter>
-    """
-    # Prefer attribute form; fall back to child elements.
+    """Parse <parameter> or <assignment> (attribute or element form)."""
     name = elem.get("name")
     if name is None:
-        name_elem = elem.find("name")
-        name = name_elem.text.strip() if (name_elem is not None and name_elem.text) else None
+        ne = elem.find("name")
+        name = ne.text.strip() if (ne is not None and ne.text) else None
     if not name:
         return None
-
     value_attr = elem.get("value")
     if value_attr is not None:
         raw_value = value_attr
     else:
-        val_elem = elem.find("value")
-        raw_value = (val_elem.text or "") if val_elem is not None else ""
-
-    # Explicit <type> element (present in <parameter>, absent in <assignment>)
-    type_elem = elem.find("type")
-    if type_elem is not None and type_elem.text:
-        dt = Parameter.data_type_by_name(type_elem.text.strip()) or _infer_type(raw_value)
+        ve = elem.find("value")
+        raw_value = (ve.text or "") if ve is not None else ""
+    te = elem.find("type")
+    if te is not None and te.text:
+        dt = Parameter.data_type_by_name(te.text.strip()) or _infer_type(raw_value)
     else:
         dt = _infer_type(raw_value)
+    return Parameter(name, _coerce_value(raw_value, dt), dt)
 
-    value = _coerce_value(raw_value, dt)
-    return Parameter(name, value, dt)
-
-
-# ---------------------------------------------------------------------------
-# Interface parsing
-# ---------------------------------------------------------------------------
 
 def _kind_to_type_and_master(kind: str, direction: str) -> Optional[Tuple[SystemDataType, bool]]:
-    """
-    Map an interface kind (and optional direction attribute) to
-    (SystemDataType, is_master).
-
-    For ``conduit_end`` the direction attribute ("start" = source/master,
-    "end" = sink/slave) determines is_master.
-    """
-    entry = _INTF_KIND_MAP.get(kind.lower())
-    if entry is None:
-        return None
-    data_type, is_master = entry
-    if kind.lower() == "conduit_end":
-        is_master = direction.lower() == "start"
-    return data_type, is_master
+    """Map interface kind -> (SystemDataType, is_master).  Mirrors SopcInfoInterface.setKind."""
+    return _INTF_KIND_MAP.get(kind.lower())
 
 
 def _parse_interface(elem: ET.Element, owner: BasicComponent) -> Optional[Interface]:
-    """Parse one <interface> element into an Interface attached to *owner*."""
+    """Parse one <interface> element."""
     name = elem.get("name", "")
     kind = elem.get("kind", "")
     direction = elem.get("direction", "end")
-
     mapping = _kind_to_type_and_master(kind, direction)
     if mapping is None:
         logger.debug("Ignoring unknown interface kind %r on %s", kind, owner.instance_name)
         return None
-
     data_type, is_master = mapping
     intf = Interface(name, data_type, is_master, owner)
-
-    # Parse child parameters and assignments
     for child in elem:
         if child.tag in ("parameter", "assignment"):
-            param = _parse_param_elem(child)
-            if param:
-                intf.add_param(param)
-
-    # Set addressable size as interface_value (MEMORY_MAPPED slave interfaces only).
-    # This is later used by the DTS generator to emit the `reg` size cell.
-    # Mirrors SopcInfoInterface.endElement("interface") in Java.
+            p = _parse_param_elem(child)
+            if p:
+                intf.add_param(p)
+    # Set interface_value -- mirrors SopcInfoInterface.endElement in Java.
     if data_type == SystemDataType.MEMORY_MAPPED and not is_master:
-        addr_p = intf.get_param_by_name("addressableSize")
-        if addr_p:
+        # Java reads addressSpan (not addressableSize).
+        span_p = intf.get_param_by_name("addressSpan")
+        if span_p:
+            step = 1
+            al = intf.get_param_by_name("addressAlignment")
+            if al and al.value == "NATIVE":
+                un = intf.get_param_by_name("addressUnits")
+                if un and un.value.upper() == "WORDS":
+                    step = 4
             try:
-                intf.interface_value = [int(addr_p.value, 0)]
+                intf.interface_value = [int(span_p.value, 0) * step]
             except (ValueError, TypeError):
-                logger.warning(
-                    "Cannot parse addressableSize %r on %s.%s",
-                    addr_p.value, owner.instance_name, name,
-                )
-
+                logger.warning("Cannot parse addressSpan %r on %s.%s",
+                               span_p.value, owner.instance_name, name)
+    elif data_type == SystemDataType.CLOCK and is_master:
+        # Java: bi.setInterfaceValue(DTHelper.parseSize4Intf(getParamValue("clockRate"), bi))
+        rate_p = intf.get_param_by_name("clockRate")
+        if rate_p:
+            try:
+                intf.interface_value = [int(rate_p.value, 0)]
+            except (ValueError, TypeError):
+                logger.warning("Cannot parse clockRate %r on %s.%s",
+                               rate_p.value, owner.instance_name, name)
     return intf
 
 
-# ---------------------------------------------------------------------------
-# Module (component) parsing
-# ---------------------------------------------------------------------------
-
-def _parse_module(
-    elem: ET.Element,
-    lib: SopcComponentLib,
-) -> Optional[BasicComponent]:
-    """Parse one <module> element into a BasicComponent."""
+def _parse_module(elem: ET.Element, lib: SopcComponentLib) -> Optional[BasicComponent]:
+    """Parse one <module> element."""
     kind = elem.get("kind", "")
     name = elem.get("name", "")
     version = elem.get("version", "")
-
     if not name:
-        logger.warning("Module element missing name attribute — skipping")
+        logger.warning("Module element missing name -- skipping")
         return None
-
     comp = lib.get_component_for_class(kind, name, version)
-
     for child in elem:
         if child.tag in ("parameter", "assignment"):
-            param = _parse_param_elem(child)
-            if param:
-                comp.add_param(param)
+            p = _parse_param_elem(child)
+            if p:
+                comp.add_param(p)
         elif child.tag == "interface":
             intf = _parse_interface(child, comp)
             if intf:
                 comp.add_interface(intf)
-
     return comp
 
-
-# ---------------------------------------------------------------------------
-# Connection resolution
-# ---------------------------------------------------------------------------
 
 def _resolve_intf(
     ref: str,
     system: AvalonSystem,
 ) -> Tuple[Optional[BasicComponent], Optional[Interface]]:
-    """
-    Resolve a "module_name.interface_name" reference string to a
-    (BasicComponent, Interface) pair.  Returns (None, None) on failure.
-    """
     dot = ref.find(".")
     if dot < 0:
         logger.warning("Cannot parse interface reference %r (no dot)", ref)
         return None, None
-    comp_name = ref[:dot]
-    intf_name = ref[dot + 1:]
-    comp = system.get_component_by_name(comp_name)
+    comp = system.get_component_by_name(ref[:dot])
     if comp is None:
-        logger.warning("Connection references unknown component %r", comp_name)
+        logger.warning("Connection references unknown component %r", ref[:dot])
         return None, None
-    intf = comp.get_interface_by_name(intf_name)
+    intf = comp.get_interface_by_name(ref[dot + 1:])
     if intf is None:
-        logger.warning(
-            "Connection references unknown interface %r on %r",
-            intf_name, comp_name,
-        )
+        logger.warning("Connection references unknown interface %r on %r",
+                       ref[dot + 1:], ref[:dot])
         return None, None
     return comp, intf
 
 
 def _parse_connection(elem: ET.Element, system: AvalonSystem) -> None:
-    """
-    Parse one <connection> element and wire it into the system.
-    Mirrors SopcInfoConnection + connectComponents() from Java.
-    """
+    """Parse one <connection> element.  Routing via text child elements (not attrs)."""
     kind = elem.get("kind", "").lower()
-    start = elem.get("start", "")   # master side: "comp.intf"
-    end = elem.get("end", "")       # slave side:  "comp.intf"
-
-    # Reset connections carry no DTS information — skip them.
     if kind == "reset":
         return
-
     conn_type = _CONN_KIND_MAP.get(kind)
     if conn_type is None:
-        logger.debug("Ignoring connection of unrecognised kind %r (%s→%s)", kind, start, end)
+        logger.debug("Ignoring connection of unrecognised kind %r", kind)
         return
-
-    _master_comp, master_intf = _resolve_intf(start, system)
-    _slave_comp, slave_intf = _resolve_intf(end, system)
-
-    if master_intf is None or slave_intf is None:
-        return  # warning already logged by _resolve_intf
-
-    # Collect connection-level parameters (baseAddress, clockRate, irqNumber)
+    start_module = start_cp = end_module = end_cp = ""
     conn_params: dict[str, Parameter] = {}
     for child in elem:
-        if child.tag in ("parameter", "assignment"):
+        tag = child.tag
+        if tag == "startModule":
+            start_module = (child.text or "").strip()
+        elif tag == "startConnectionPoint":
+            start_cp = (child.text or "").strip()
+        elif tag == "endModule":
+            end_module = (child.text or "").strip()
+        elif tag == "endConnectionPoint":
+            end_cp = (child.text or "").strip()
+        elif tag in ("parameter", "assignment"):
             p = _parse_param_elem(child)
             if p:
                 conn_params[p.name.lower()] = p
-
-    # Build and register the Connection.
-    # connect=True appends it to both interfaces' connection lists.
+    if not (start_module and start_cp and end_module and end_cp):
+        logger.warning("Connection of kind %r missing routing elements", kind)
+        return
+    start = f"{start_module}.{start_cp}"
+    end = f"{end_module}.{end_cp}"
+    _, master_intf = _resolve_intf(start, system)
+    _, slave_intf = _resolve_intf(end, system)
+    if master_intf is None or slave_intf is None:
+        return
     conn = Connection(master_intf, slave_intf, conn_type, connect=True)
-
-    # Set the connection value (used by the DTS generator for addresses / IRQs).
-    # We assign conn_value directly rather than through set_conn_value to avoid
-    # width checks during parse — the widths are updated later in recheck_components.
     if conn_type == SystemDataType.MEMORY_MAPPED:
         bp = conn_params.get("baseaddress")
         if bp:
             try:
                 conn.conn_value = [int(bp.value, 0)]
             except (ValueError, TypeError):
-                logger.warning("Cannot parse baseAddress %r for %s→%s", bp.value, start, end)
-
+                logger.warning("Cannot parse baseAddress %r for %s->%s", bp.value, start, end)
     elif conn_type == SystemDataType.CLOCK:
-        # The clock rate is stored both as the connection value and on the
-        # master interface as interface_value (so slaves can read it via
-        # get_clock_rate() without following the connection object).
-        rp = conn_params.get("clockrate")
-        if rp:
-            try:
-                rate = int(rp.value, 0)
-                conn.conn_value = [rate]
-                if master_intf.interface_value is None:
-                    master_intf.interface_value = [rate]
-            except (ValueError, TypeError):
-                logger.warning("Cannot parse clockRate %r for %s→%s", rp.value, start, end)
-
+        # Java: bc.setConnValue(bc.getMasterInterface().getInterfaceValue())
+        if master_intf.interface_value is not None:
+            conn.conn_value = list(master_intf.interface_value)
+        else:
+            logger.warning("Clock %s->%s: master has no clockRate", start, end)
     elif conn_type == SystemDataType.INTERRUPT:
         ip = conn_params.get("irqnumber")
         if ip:
             try:
                 conn.conn_value = [int(ip.value, 0)]
             except (ValueError, TypeError):
-                logger.warning("Cannot parse irqNumber %r for %s→%s", ip.value, start, end)
+                logger.warning("Cannot parse irqNumber %r for %s->%s", ip.value, start, end)
 
-
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
 
 def load_system(
     source: "str | Path",
     component_lib: Optional[SopcComponentLib] = None,
 ) -> AvalonSystem:
     """
-    Parse a ``.sopcinfo`` (EnsembleReport) file and return an
-    :class:`~sopc2dts_py.model.system.AvalonSystem`.
+    Parse a .sopcinfo (EnsembleReport) file and return an AvalonSystem.
 
-    Parameters
-    ----------
-    source:
-        Path to the ``.sopcinfo`` file.
-    component_lib:
-        The :class:`~sopc2dts_py.model.component_lib.SopcComponentLib` to use
-        for component lookup.  Defaults to the process-wide singleton.
-
-    Raises
-    ------
-    ValueError
-        If the root element is not ``EnsembleReport``.
-    ET.ParseError
-        If the XML is malformed.
+    Raises ValueError if root is not EnsembleReport, ET.ParseError if malformed.
     """
     source = Path(source)
     lib = component_lib or SopcComponentLib.get_instance()
-
     logger.info("Loading sopcinfo: %s", source)
     tree = ET.parse(source)
     root = tree.getroot()
-
     if root.tag != "EnsembleReport":
         raise ValueError(
-            f"Expected <EnsembleReport> root element, got <{root.tag}> "
-            f"in {source}"
+            f"Expected <EnsembleReport> root element, got <{root.tag}> in {source}"
         )
-
     name = root.get("name", source.stem)
-    version = root.get("quartusVersion", "unknown")
-
+    # Java reads atts.getValue("version"); fall back to quartusVersion for old files.
+    version = root.get("version") or root.get("quartusVersion", "unknown")
     system = AvalonSystem(name, version, source)
-    system.set_version(version)
-
-    # --- Parse modules → components ---
+    # <reportVersion> text child overrides -- mirrors SopcInfoSystemLoader.characters()
+    rv = root.find("reportVersion")
+    if rv is not None and rv.text:
+        system.set_version(rv.text.strip())
     for mod_elem in root.findall("module"):
         comp = _parse_module(mod_elem, lib)
         if comp is not None:
             system.add_component(comp)
-
     logger.debug("Parsed %d components", len(system.components))
-
-    # --- Wire connections ---
     for conn_elem in root.findall("connection"):
         _parse_connection(conn_elem, system)
-
-    # --- Post-parse validation ---
     system.recheck_components()
-
-    logger.info(
-        "Loaded system %r: %d components", system.name, len(system.components)
-    )
+    logger.info("Loaded system %r: %d components", system.name, len(system.components))
     return system

@@ -147,10 +147,15 @@ def test_parse_param_elem_form_no_type():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("kind,direction,expected_type,expected_master", [
+    # Memory-mapped
     ("avalon_master",                 "start", SystemDataType.MEMORY_MAPPED,       True),
     ("avalon_slave",                  "end",   SystemDataType.MEMORY_MAPPED,       False),
-    ("interrupt_sender",              "start", SystemDataType.INTERRUPT,            True),
-    ("interrupt_receiver",            "end",   SystemDataType.INTERRUPT,            False),
+    ("altera_axi4_master",            "start", SystemDataType.MEMORY_MAPPED,       True),
+    ("axi4lite_slave",                "end",   SystemDataType.MEMORY_MAPPED,       False),
+    # Interrupts: Java maps interrupt_receiver→isMaster=True, sender→False
+    ("interrupt_sender",              "start", SystemDataType.INTERRUPT,            False),
+    ("interrupt_receiver",            "end",   SystemDataType.INTERRUPT,            True),
+    # Clock / Reset / Streaming / Custom
     ("clock_source",                  "start", SystemDataType.CLOCK,                True),
     ("clock_sink",                    "end",   SystemDataType.CLOCK,                False),
     ("reset_source",                  "start", SystemDataType.RESET,                True),
@@ -159,9 +164,10 @@ def test_parse_param_elem_form_no_type():
     ("avalon_streaming_sink",         "end",   SystemDataType.STREAMING,            False),
     ("nios_custom_instruction_master","start", SystemDataType.CUSTOM_INSTRUCTION,   True),
     ("nios_custom_instruction_slave", "end",   SystemDataType.CUSTOM_INSTRUCTION,   False),
-    ("conduit_end",                   "start", SystemDataType.CONDUIT,              True),
+    # Conduit: Java maps all conduit variants → isMaster=False
+    ("conduit",                       "end",   SystemDataType.CONDUIT,              False),
+    ("conduit_start",                 "end",   SystemDataType.CONDUIT,              False),
     ("conduit_end",                   "end",   SystemDataType.CONDUIT,              False),
-    ("conduit_master",                "start", SystemDataType.CONDUIT,              True),
 ])
 def test_interface_kind_mapping(kind, direction, expected_type, expected_master):
     result = _kind_to_type_and_master(kind, direction)
@@ -180,16 +186,17 @@ def test_interface_kind_unknown():
 
 MINIMAL_SOPCINFO = textwrap.dedent("""\
     <?xml version="1.0" encoding="UTF-8"?>
-    <EnsembleReport name="test_sys" quartusVersion="13.1">
+    <EnsembleReport name="test_sys" version="13.1">
         <module name="clk_0" kind="altera_clock_bridge" version="13.0">
-            <parameter name="clockRate" value="50000000"/>
-            <interface name="clk" kind="clock_source" direction="start"/>
+            <interface name="clk" kind="clock_source" direction="start">
+                <parameter name="clockRate" value="50000000"/>
+            </interface>
         </module>
         <module name="uart_0" kind="altera_avalon_uart" version="13.0">
             <parameter name="BAUD_RATE" value="115200"/>
             <interface name="clk" kind="clock_sink" direction="end"/>
             <interface name="s1" kind="avalon_slave" direction="end">
-                <parameter name="addressableSize" value="32"/>
+                <parameter name="addressSpan" value="32"/>
             </interface>
             <interface name="irq" kind="interrupt_sender" direction="start"/>
         </module>
@@ -199,24 +206,38 @@ MINIMAL_SOPCINFO = textwrap.dedent("""\
             <interface name="data_master" kind="avalon_master" direction="start"/>
             <interface name="d32" kind="interrupt_receiver" direction="end"/>
         </module>
-        <connection kind="clock" version="13.0"
-                    start="clk_0.clk" end="uart_0.clk">
-            <parameter name="clockRate" value="50000000"/>
+        <connection kind="clock" version="13.0">
+            <startModule>clk_0</startModule>
+            <startConnectionPoint>clk</startConnectionPoint>
+            <endModule>uart_0</endModule>
+            <endConnectionPoint>clk</endConnectionPoint>
         </connection>
-        <connection kind="clock" version="13.0"
-                    start="clk_0.clk" end="cpu_0.clk">
-            <parameter name="clockRate" value="50000000"/>
+        <connection kind="clock" version="13.0">
+            <startModule>clk_0</startModule>
+            <startConnectionPoint>clk</startConnectionPoint>
+            <endModule>cpu_0</endModule>
+            <endConnectionPoint>clk</endConnectionPoint>
         </connection>
-        <connection kind="avalon" version="13.0"
-                    start="cpu_0.data_master" end="uart_0.s1">
+        <connection kind="avalon" version="13.0">
+            <startModule>cpu_0</startModule>
+            <startConnectionPoint>data_master</startConnectionPoint>
+            <endModule>uart_0</endModule>
+            <endConnectionPoint>s1</endConnectionPoint>
             <parameter name="baseAddress" value="0x00000100"/>
         </connection>
-        <connection kind="interrupt" version="13.0"
-                    start="uart_0.irq" end="cpu_0.d32">
+        <connection kind="interrupt" version="13.0">
+            <startModule>uart_0</startModule>
+            <startConnectionPoint>irq</startConnectionPoint>
+            <endModule>cpu_0</endModule>
+            <endConnectionPoint>d32</endConnectionPoint>
             <parameter name="irqNumber" value="1"/>
         </connection>
-        <connection kind="reset" version="13.0"
-                    start="clk_0.clk_reset" end="uart_0.reset"/>
+        <connection kind="reset" version="13.0">
+            <startModule>clk_0</startModule>
+            <startConnectionPoint>clk_reset</startConnectionPoint>
+            <endModule>uart_0</endModule>
+            <endConnectionPoint>reset</endConnectionPoint>
+        </connection>
     </EnsembleReport>
 """)
 
@@ -272,9 +293,10 @@ def test_interface_types(minimal_system):
     assert s1.type == SystemDataType.MEMORY_MAPPED
     assert not s1.is_master
 
+    # interrupt_sender maps to isMaster=False per Java SopcInfoInterface.setKind
     irq = uart.get_interface_by_name("irq")
     assert irq.type == SystemDataType.INTERRUPT
-    assert irq.is_master
+    assert not irq.is_master
 
 
 def test_addressable_size_set(minimal_system):
