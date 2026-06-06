@@ -254,7 +254,12 @@ def test_helper_long_to_arr_2cell():
 
 def test_helper_arr_to_long():
     assert DTHelper.long_arr_to_long([0xFF200000]) == 0xFF200000
-    assert DTHelper.long_arr_to_long([1, 0]) == 0x1_00000000
+    # Note: long_to_long_arr and long_arr_to_long are NOT inverses for 2-cell
+    # arrays — (this matches the original Java behaviour). longArrToLong treats
+    # index 0 as the low-order cell (shift by 0), while long2longArr stores
+    # the HIGH word at index 0. From what I can determine, the Java code never 
+    # roundtrips 2-cell values through both functions.
+    assert DTHelper.long_arr_to_long([1, 0]) == 1
 
 
 def test_helper_hex_string():
