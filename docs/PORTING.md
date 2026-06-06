@@ -54,8 +54,8 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 - [x] `component_lib.py` — `SopcComponentLib` equivalent (XML-driven component registry)
 
 ### Parsers (`sopc2dts/parsers/`)
-- [ ] `sopcinfo.py` — port `SopcInfoSystemLoader` (SAX → `ElementTree`)
-- [ ] `qsys.py` — port `QSysSystemLoader`
+- [x] `sopcinfo.py` — port `SopcInfoSystemLoader` (SAX → `ElementTree`)
+- [x] `qsys.py` — port `QSysSystemLoader`
 - [ ] `boardinfo_xml.py` — port `BoardInfo.load()` (boardinfo XML → `BoardInfo`)
 - [ ] `component_xml.py` — port component library XML loader (`sopc_components_*.xml`)
 
