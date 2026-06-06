@@ -19,6 +19,7 @@ from typing import Optional, List, TYPE_CHECKING
 
 from .component import BasicComponent
 from .enums import SystemDataType
+from ..log import logger
 
 if TYPE_CHECKING:
     pass
@@ -97,6 +98,119 @@ class AvalonSystem:
     @property
     def version_minor(self) -> int:
         return getattr(self, "_version_minor", 0)
+
+    def remove_component(self, comp: BasicComponent) -> bool:
+        try:
+            self._components.remove(comp)
+            return True
+        except ValueError:
+            return False
+
+    # ------------------------------------------------------------------
+    # Post-parse validation (port of AvalonSystem.recheckComponents)
+    # ------------------------------------------------------------------
+
+    def recheck_components(self) -> None:
+        """
+        Post-parse component cleanup and validation.
+        Port of AvalonSystem.recheckComponents.
+
+        Hierarchy / QSys subsystem detection is handled by qsys.py, not here.
+        SICBridge.removeFromSystemIfPossible is deferred to the Component
+        handlers phase.
+        """
+        # Late import to avoid circular dependency at module level.
+        from .component_lib import SopcComponentLib
+
+        # --- Transparent interface bridges ---
+        # STREAMING-type bridges are fully handled in Java by reconnecting the
+        # connections; other types log a warning. We only log for now — full
+        # implementation needs SICBridge (Component handlers phase).
+        for comp in list(self._components):
+            if comp.scd:
+                for bridge in comp.scd.get_transparent_bridges():
+                    master_intf = comp.get_interface_by_name(bridge.master_intf_name or "")
+                    slave_intf = comp.get_interface_by_name(bridge.slave_intf_name or "")
+                    if master_intf is None or slave_intf is None:
+                        logger.warning(
+                            "Failed to find interfaces for transparent bridge in "
+                            "%s (%s)", comp.instance_name, comp.class_name,
+                        )
+                        continue
+                    if master_intf.type != slave_intf.type:
+                        logger.warning(
+                            "Transparent bridge in %s (%s): master/slave type mismatch",
+                            comp.instance_name, comp.class_name,
+                        )
+                        continue
+                    if master_intf.type.name == "STREAMING":
+                        # Rewire: create a direct connection from the external master
+                        # to the external slave, bypassing this transparent component.
+                        from .connection import Connection
+                        conn_to_master = slave_intf.connections[0] if slave_intf.connections else None
+                        conn_to_slave = master_intf.connections[0] if master_intf.connections else None
+                        if conn_to_master and conn_to_slave:
+                            new_conn = Connection(
+                                conn_to_master.master_interface,
+                                conn_to_slave.slave_interface,
+                                master_intf.type,
+                                connect=True,
+                            )
+                            _ = new_conn  # registered on the interfaces via connect=True
+                            try:
+                                conn_to_master.master_interface.connections.remove(conn_to_master)
+                            except ValueError:
+                                pass
+                            try:
+                                conn_to_slave.slave_interface.connections.remove(conn_to_slave)
+                            except ValueError:
+                                pass
+                    else:
+                        logger.warning(
+                            "Transparent bridge in %s (%s) of type %s not yet supported",
+                            comp.instance_name, comp.class_name, master_intf.type.name,
+                        )
+
+        # --- Remove components whose SCD group is "remove" ---
+        i = 0
+        while i < len(self._components):
+            comp = self._components[i]
+            if comp.scd and comp.scd.group.lower() == "remove":
+                for intf in list(comp.interfaces):
+                    for conn in list(intf.connections):
+                        other = (
+                            conn.slave_interface if intf.is_master
+                            else conn.master_interface
+                        )
+                        if other is not None:
+                            try:
+                                other.connections.remove(conn)
+                            except ValueError:
+                                pass
+                    intf.connections.clear()
+                self._components.pop(i)
+                # do not advance — re-check same index
+            else:
+                i += 1
+
+        # --- final_check_on_component + optional bridge flattening ---
+        lib = SopcComponentLib.get_instance()
+        restart = True
+        while restart:
+            restart = False
+            for i, comp in enumerate(list(self._components)):
+                checked = lib.final_check_on_component(comp)
+                if checked is not comp:
+                    self._components.remove(comp)
+                    self._components.append(checked)
+                    restart = True
+                    break
+                # TODO (Component handlers phase): uncomment once SICBridge is ported
+                # if comp.remove_from_system_if_possible(self):
+                #     restart = True
+                #     break
+
+    # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
         return f"AvalonSystem({self.name!r}, {len(self._components)} components)"
