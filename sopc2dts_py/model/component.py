@@ -230,13 +230,72 @@ class Interface(BasicElement):
 
 
 # ---------------------------------------------------------------------------
-# SopcComponentDescription placeholder
+# SopcComponentDescription — port of sopc2dts.lib.components.SopcComponentDescription
 # ---------------------------------------------------------------------------
+
+class SICAutoParam:
+    """
+    A mapping from a sopcinfo parameter name to a DTS property name.
+    Port of SopcComponentDescription.SICAutoParam (inner class in Java).
+    """
+
+    def __init__(
+        self,
+        dts_name: str,
+        sopc_info_name: Optional[str],
+        force_type: Optional[str],
+        fixed_value: Optional[str] = None,
+    ) -> None:
+        self.dts_name = dts_name
+        self.sopc_info_name = sopc_info_name
+        self.force_type = force_type
+        self.fixed_value = fixed_value
+
+    def __repr__(self) -> str:
+        return f"SICAutoParam({self.dts_name!r} <- {self.sopc_info_name!r})"
+
+
+class SICRequiredParam:
+    """
+    A name/value pair that must be present on a component for an SCD to match.
+    Port of SopcComponentDescription.SICRequiredParam (protected inner class).
+    """
+
+    def __init__(self, name: str, value: str) -> None:
+        self.name = name
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"SICRequiredParam({self.name!r}={self.value!r})"
+
+
+class TransparentInterfaceBridge:
+    """
+    Describes a master→slave interface pair that is transparent at bridge level.
+    Port of SopcComponentDescription.TransparentInterfaceBridge (inner class).
+    """
+
+    def __init__(
+        self,
+        master: Optional[str] = None,
+        slave: Optional[str] = None,
+        data_type: Optional[SystemDataType] = None,
+    ) -> None:
+        self.master_intf_name = master
+        self.slave_intf_name = slave
+        self.type = data_type
+
+    def __repr__(self) -> str:
+        return f"TransparentInterfaceBridge({self.master_intf_name!r} -> {self.slave_intf_name!r})"
+
 
 class SopcComponentDescription:
     """
-    Minimal placeholder — full implementation lives in component_lib.py.
-    Provides the fields BasicComponent needs before the library is loaded.
+    Describes a class of IP component: the compatible strings it generates,
+    the sopcinfo parameters to emit as DTS properties, and required parameter
+    constraints used for version disambiguation.
+
+    Port of sopc2dts.lib.components.SopcComponentDescription.
     """
 
     def __init__(
@@ -244,22 +303,171 @@ class SopcComponentDescription:
         class_name: str,
         group: str = "unknown",
         vendor: str = "unknown",
+        device: Optional[str] = None,
     ) -> None:
+        # Java splits the classname on commas (multi-class entries in XML).
+        # Keep the original string as `class_name` for backward compat with
+        # existing code that accesses scd.class_name directly.
         self.class_name = class_name
+        self.class_names: List[str] = [n.strip() for n in class_name.split(",")]
         self.group = group
         self.vendor = vendor
-        self._compatibles: List[str] = []
-        self._auto_params: List = []
+        self.device = device
 
-    def get_compatibles(self, version: str) -> List[str]:
-        return self._compatibles
+        self._compatibles: List[str] = []
+        self._auto_params: List[SICAutoParam] = []
+        self._required_params: List[SICRequiredParam] = []
+        self._compatible_versions: List[str] = []
+        self._override_versions: List[str] = []
+        self._transparent_bridges: List[TransparentInterfaceBridge] = []
+
+    # ------------------------------------------------------------------
+    # Mutation helpers (called by XML loader)
+    # ------------------------------------------------------------------
+
+    def add_compatible(self, compat: str) -> None:
+        self._compatibles.append(compat)
+
+    def add_auto_param(
+        self,
+        dts_name: str,
+        sopc_name: Optional[str],
+        force_type: Optional[str],
+        fixed_value: Optional[str] = None,
+    ) -> None:
+        self._auto_params.append(SICAutoParam(dts_name, sopc_name, force_type, fixed_value))
+
+    def add_required_param(self, name: str, value: str) -> None:
+        self._required_params.append(SICRequiredParam(name, value))
+
+    def add_compatible_version(self, version: str) -> None:
+        self._compatible_versions.append(version)
+
+    def add_override_version(self, version: str) -> None:
+        self._override_versions.append(version)
+
+    # ------------------------------------------------------------------
+    # Accessors
+    # ------------------------------------------------------------------
 
     @property
-    def auto_params(self) -> List:
+    def auto_params(self) -> List[SICAutoParam]:
         return self._auto_params
 
+    def get_auto_params(self) -> List[SICAutoParam]:
+        return self._auto_params
+
+    def get_required_params(self) -> List[SICRequiredParam]:
+        return self._required_params
+
+    def get_transparent_bridges(self) -> List[TransparentInterfaceBridge]:
+        return self._transparent_bridges
+
+    def get_class_names(self) -> List[str]:
+        return self.class_names
+
+    # ------------------------------------------------------------------
+    # Matching / version logic
+    # ------------------------------------------------------------------
+
+    def is_supporting_class_name(self, cn: str) -> bool:
+        """Return True if this SCD handles the given IP class name."""
+        cn_lower = cn.lower()
+        return any(n.lower() == cn_lower for n in self.class_names)
+
+    def is_required_params_ok(self, comp: "BasicComponent") -> bool:
+        """True iff comp has all required param name/value pairs."""
+        for rp in self._required_params:
+            if comp.get_param_by_name(rp.name) is None:
+                return False
+            if not (comp.get_param_val_by_name(rp.name) or "").lower() == rp.value.lower():
+                return False
+        return True
+
+    def is_overridden_version(self, version: str) -> bool:
+        """True if this SCD overrides (replaces) the given component version."""
+        for v in self._override_versions:
+            if self.compare_versions(v, version) == 0:
+                return True
+        return False
+
+    @staticmethod
+    def compare_versions(v1: str, v2: str) -> int:
+        """
+        Numeric/lexicographic version comparison. Returns <0 if v1<v2,
+        0 if equal, >0 if v1>v2. Port of SopcComponentDescription.compareVersions.
+        """
+        v1_parts = v1.split(".")
+        v2_parts = v2.split(".")
+        diff = 0
+        for i in range(min(len(v1_parts), len(v2_parts))):
+            if diff != 0:
+                break
+            try:
+                diff = int(v2_parts[i], 0) - int(v1_parts[i], 0)
+            except ValueError:
+                a, b = v1_parts[i].lower(), v2_parts[i].lower()
+                diff = (b > a) - (b < a)  # +1 if v2>v1, -1 if v1>v2, 0 if equal
+        if diff == 0:
+            diff = len(v2_parts) - len(v1_parts)
+        if diff == 0:
+            diff = len(v2) - len(v1)
+        return diff
+
+    def _get_compatible_version(self, version: str) -> Optional[str]:
+        """
+        Find the best backward-compatible version string, matching Java logic.
+        Returns the lowest compatible version that is still >= the requested
+        version, or None if the version is already listed or no compat exists.
+        """
+        compat: Optional[str] = None
+        for bw in self._compatible_versions:
+            if version.lower() == bw.lower():
+                return None
+            if compat is None or self.compare_versions(bw, compat) < 0:
+                if self.compare_versions(bw, version) > 0:
+                    compat = bw
+        return compat
+
+    def get_compatibles(self, version: Optional[str]) -> List[str]:
+        """
+        Build the ordered list of compatible strings for this component.
+        Mirrors SopcComponentDescription.getCompatibles.
+        """
+        result: List[str] = []
+        base = f"{self.vendor},{self.device}" if self.device else f"{self.vendor},unknown"
+        if version is not None:
+            result.append(f"{base}-{version}")
+            bw = self._get_compatible_version(version)
+            if bw is not None:
+                result.append(f"{base}-{bw}")
+        else:
+            result.append(base)
+        result.extend(self._compatibles)
+        return result
+
+    def get_compatible(self, version: Optional[str]) -> str:
+        """Comma-quoted compatible string, e.g. '"altr,nios2-1.0", "altr,nios2"'."""
+        return ",".join(f'"{c}"' for c in self.get_compatibles(version))
+
+    # ------------------------------------------------------------------
+    # Misc
+    # ------------------------------------------------------------------
+
+    def set_group(self, group: str) -> None:
+        self.group = group
+
+    def get_group(self) -> str:
+        return self.group
+
+    def get_vendor(self) -> str:
+        return self.vendor
+
+    def get_device(self) -> Optional[str]:
+        return self.device
+
     def __repr__(self) -> str:
-        return f"SopcComponentDescription({self.class_name!r})"
+        return f"SopcComponentDescription({self.class_name!r}, group={self.group!r})"
 
 
 # ---------------------------------------------------------------------------
