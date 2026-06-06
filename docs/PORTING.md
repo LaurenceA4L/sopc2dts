@@ -51,7 +51,7 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 - [x] `enums.py` — `SystemDataType`, `ParameterAction` (added to avoid circular imports)
 - [x] `boardinfo.py` — `BoardInfo` + boardinfo XML components (Ethernet, I2C, SPI, Flash, DTAppend)
 - [x] `devicetree.py` — `DTNode`, `DTProperty`, `DTPropVal` subtypes, `DTBlob`, `DTHelper`
-- [ ] `component_lib.py` — `SopcComponentLib` equivalent (XML-driven component registry)
+- [x] `component_lib.py` — `SopcComponentLib` equivalent (XML-driven component registry)
 
 ### Parsers (`sopc2dts/parsers/`)
 - [ ] `sopcinfo.py` — port `SopcInfoSystemLoader` (SAX → `ElementTree`)
