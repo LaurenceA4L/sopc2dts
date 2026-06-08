@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EnsembleReport name="soc_system" kind="soc_system" version="1.0" fabric="QSYS">
+ <!-- Synthetic Cyclone V SoC GHRD-style fixture -->
+ <!-- Covers: GPIO, clock, altera_hps (ignored), arm_gic, hps_bridge_avalon, sysid -->
+ <parameter name="AUTO_DEVICE_FAMILY">
+  <type>java.lang.String</type>
+  <value>CYCLONEV</value>
+  <derived>false</derived>
+  <enabled>true</enabled>
+  <visible>false</visible>
+  <valid>true</valid>
+  <sysinfo_type>DEVICE_FAMILY</sysinfo_type>
+ </parameter>
+ <module name="clk_0" kind="clock_source" version="14.1" path="clk_0">
+  <interface name="clk" kind="clock_source" version="14.1">
+   <parameter name="clockFrequency" value="50000000"/>
+  </interface>
+  <interface name="clk_reset" kind="reset_source" version="14.1">
+  </interface>
+ </module>
+ <module name="button_pio" kind="altera_avalon_pio" version="14.1" path="button_pio">
+  <parameter name="width" value="4"/>
+  <parameter name="direction" value="Input"/>
+  <interface name="clk" kind="clock_sink" version="14.1">
+  </interface>
+  <interface name="reset" kind="reset_sink" version="14.1">
+  </interface>
+  <interface name="s1" kind="avalon_slave" version="14.1">
+   <parameter name="addressSpan" value="16"/>
+  </interface>
+  <interface name="irq" kind="interrupt_sender" version="14.1">
+  </interface>
+  <interface name="external_connection" kind="conduit_end" version="14.1">
+  </interface>
+ </module>
+ <module name="led_pio" kind="altera_avalon_pio" version="14.1" path="led_pio">
+  <parameter name="width" value="10"/>
+  <parameter name="direction" value="Output"/>
+  <interface name="clk" kind="clock_sink" version="14.1">
+  </interface>
+  <interface name="reset" kind="reset_sink" version="14.1">
+  </interface>
+  <interface name="s1" kind="avalon_slave" version="14.1">
+   <parameter name="addressSpan" value="16"/>
+  </interface>
+  <interface name="external_connection" kind="conduit_end" version="14.1">
+  </interface>
+ </module>
+ <module name="sysid_qsys" kind="altera_avalon_sysid_qsys" version="14.1" path="sysid_qsys">
+  <interface name="clk" kind="clock_sink" version="14.1">
+  </interface>
+  <interface name="reset" kind="reset_sink" version="14.1">
+  </interface>
+  <interface name="control_slave" kind="avalon_slave" version="14.1">
+   <parameter name="addressSpan" value="8"/>
+  </interface>
+ </module>
+ <!-- HPS top-level component: group=ignore in sopc_components_altera.xml -->
+ <module name="hps_0" kind="altera_hps" version="14.1" path="hps_0">
+  <interface name="h2f_lw_axi_master" kind="avalon_master" version="14.1">
+   <parameter name="addressUnits" value="SYMBOLS"/>
+  </interface>
+  <interface name="f2h_sdram0_data" kind="avalon_slave" version="14.1">
+   <parameter name="addressSpan" value="67108864"/>
+  </interface>
+  <interface name="h2f_reset" kind="reset_source" version="14.1">
+  </interface>
+ </module>
+ <!-- HPS ARM GIC: dispatched by class name ending in "arm_gic" -->
+ <module name="hps_0_arm_gic_0" kind="arm_gic" version="14.1" path="hps_0_arm_gic_0">
+  <interface name="arm_gic_ppi" kind="interrupt_receiver" version="14.1">
+  </interface>
+  <interface name="arm_gic_spi" kind="interrupt_receiver" version="14.1">
+  </interface>
+ </module>
+ <!-- HPS LW bridge: dispatched by class name ending in "hps_bridge_avalon" -->
+ <module name="lw_fpga2hps" kind="lw_h2f_hps_bridge_avalon" version="14.1" path="lw_fpga2hps">
+  <interface name="h2f" kind="avalon_master" version="14.1">
+   <parameter name="addressUnits" value="SYMBOLS"/>
+  </interface>
+  <interface name="h2f_reset" kind="reset_sink" version="14.1">
+  </interface>
+  <interface name="axi_h2f" kind="avalon_slave" version="14.1">
+   <parameter name="addressSpan" value="2097152"/>
+  </interface>
+ </module>
+ <!-- Clock connections -->
+ <connection kind="clock" version="14.1">
+  <startModule>clk_0</startModule>
+  <startConnectionPoint>clk</startConnectionPoint>
+  <endModule>button_pio</endModule>
+  <endConnectionPoint>clk</endConnectionPoint>
+ </connection>
+ <connection kind="clock" version="14.1">
+  <startModule>clk_0</startModule>
+  <startConnectionPoint>clk</startConnectionPoint>
+  <endModule>led_pio</endModule>
+  <endConnectionPoint>clk</endConnectionPoint>
+ </connection>
+ <connection kind="clock" version="14.1">
+  <startModule>clk_0</startModule>
+  <startConnectionPoint>clk</startConnectionPoint>
+  <endModule>sysid_qsys</endModule>
+  <endConnectionPoint>clk</endConnectionPoint>
+ </connection>
+ <!-- Reset connections -->
+ <connection kind="reset" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_reset</startConnectionPoint>
+  <endModule>button_pio</endModule>
+  <endConnectionPoint>reset</endConnectionPoint>
+ </connection>
+ <connection kind="reset" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_reset</startConnectionPoint>
+  <endModule>led_pio</endModule>
+  <endConnectionPoint>reset</endConnectionPoint>
+ </connection>
+ <connection kind="reset" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_reset</startConnectionPoint>
+  <endModule>sysid_qsys</endModule>
+  <endConnectionPoint>reset</endConnectionPoint>
+ </connection>
+ <connection kind="reset" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_reset</startConnectionPoint>
+  <endModule>lw_fpga2hps</endModule>
+  <endConnectionPoint>h2f_reset</endConnectionPoint>
+ </connection>
+ <!-- Avalon connections: HPS LW master -> FPGA slaves -->
+ <connection kind="avalon" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_lw_axi_master</startConnectionPoint>
+  <endModule>button_pio</endModule>
+  <endConnectionPoint>s1</endConnectionPoint>
+  <parameter name="baseAddress" value="0xFF200000"/>
+ </connection>
+ <connection kind="avalon" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_lw_axi_master</startConnectionPoint>
+  <endModule>led_pio</endModule>
+  <endConnectionPoint>s1</endConnectionPoint>
+  <parameter name="baseAddress" value="0xFF200010"/>
+ </connection>
+ <connection kind="avalon" version="14.1">
+  <startModule>hps_0</startModule>
+  <startConnectionPoint>h2f_lw_axi_master</startConnectionPoint>
+  <endModule>sysid_qsys</endModule>
+  <endConnectionPoint>control_slave</endConnectionPoint>
+  <parameter name="baseAddress" value="0xFF200020"/>
+ </connection>
+ <!-- IRQ: button_pio -> arm GIC SPI -->
+ <connection kind="interrupt" version="14.1">
+  <startModule>button_pio</startModule>
+  <startConnectionPoint>irq</startConnectionPoint>
+  <endModule>hps_0_arm_gic_0</endModule>
+  <endConnectionPoint>arm_gic_spi</endConnectionPoint>
+  <parameter name="irqNumber" value="72"/>
+ </connection>
+</EnsembleReport>
