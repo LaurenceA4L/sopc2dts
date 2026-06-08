@@ -118,6 +118,25 @@ See [docs/TESTING.md](TESTING.md) for the full test strategy (unit → component
 - [ ] `synthetic_labx.sopcinfo` — hand-crafted, covers `LabXEthernet` / ISP1xxx / LAN91C111
 
 **Step 2 — golden diff tests (requires Phase 2 DTS generator)**
+
+> **Decision (2026-06-08):** A true golden diff against Java tool output is not
+> currently feasible for the following reasons:
+>
+> 1. The original GSRD `.sopcinfo` releases on rocketboards.org that the Java
+>    tool was designed for are all 404 — those archives are gone.
+> 2. Modern Platform Designer exports use an updated `.sopcinfo` schema that
+>    references null fields (e.g. `nm`) the Java parser does not handle, causing
+>    `NullPointerException` crashes before any DTS is generated.
+> 3. Our synthetic test fixtures are minimal-XML stubs that also trigger those
+>    null-field crashes in the Java tool.
+>
+> **Chosen approach:** manual Java source comparison.  Read `DTGenerator.java`,
+> `DTSGenerator2.java`, and `BasicComponent.java` directly; verify that the
+> Python output for synthetic fixtures matches the logic in those files.  Any
+> deliberate deviations are recorded in the "Known Porting Deviations" section
+> above.  When real `.sopcinfo` files from supported hardware become available,
+> add them to `tests/fixtures/` and revisit.
+
 - [ ] Java reference `.dts` files generated and committed to `tests/golden/`
 - [ ] Python output matches Java output for CV SoC GHRD (whitespace-normalised)
 - [ ] Python output matches Java output for A10 SoC GHRD

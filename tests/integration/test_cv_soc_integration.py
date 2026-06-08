@@ -127,7 +127,9 @@ def test_button_pio_irq_connects_to_gic(cv_system):
     irq = next(i for i in pio.interfaces if i.name == "irq")
     assert len(irq.connections) >= 1
     conn = irq.connections[0]
-    assert conn.slave_interface.owner.instance_name == "hps_0_arm_gic_0"
+    # button_pio.irq is an interrupt_sender (slave); hps_0_arm_gic_0 is the
+    # interrupt_receiver (master).  Check the master side of the connection.
+    assert conn.master_interface.owner.instance_name == "hps_0_arm_gic_0"
 
 
 def test_hps_lw_master_connects_to_pios(cv_system):

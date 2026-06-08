@@ -292,10 +292,17 @@ def _parse_connection(elem: ET.Element, system: AvalonSystem) -> None:
         return
     start = f"{start_module}.{start_cp}"
     end = f"{end_module}.{end_cp}"
-    _, master_intf = _resolve_intf(start, system)
-    _, slave_intf = _resolve_intf(end, system)
-    if master_intf is None or slave_intf is None:
+    _, start_intf = _resolve_intf(start, system)
+    _, end_intf = _resolve_intf(end, system)
+    if start_intf is None or end_intf is None:
         return
+    # Determine master/slave from the is_master flag set by the interface kind
+    # map — this handles interrupt connections where the XML start=sender(slave)
+    # and end=receiver(master), opposite of avalon/clock conventions.
+    if end_intf.is_master and not start_intf.is_master:
+        master_intf, slave_intf = end_intf, start_intf
+    else:
+        master_intf, slave_intf = start_intf, end_intf
     conn = Connection(master_intf, slave_intf, conn_type, connect=True)
     if conn_type == SystemDataType.MEMORY_MAPPED:
         bp = conn_params.get("baseaddress")

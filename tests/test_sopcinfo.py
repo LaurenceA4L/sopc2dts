@@ -346,6 +346,46 @@ def test_interrupt_connection_irq_number(minimal_system):
     assert conn.conn_value == [1]
 
 
+def test_interrupt_connection_polarity(minimal_system):
+    """interrupt_receiver (cpu_0.d32) must be the master; sender (uart_0.irq) must be the slave.
+
+    Regression test for the sopcinfo parser bug where startModule/endModule were
+    assigned master/slave by XML position rather than interface kind.  In the
+    sopcinfo XML the interrupt sender (uart_0) appears as <startModule> and the
+    receiver (cpu_0.d32) appears as <endModule>, so naive assignment produced a
+    self-referencing interrupt-parent.
+    """
+    cpu = minimal_system.get_component_by_name("cpu_0")
+    uart = minimal_system.get_component_by_name("uart_0")
+    d32 = cpu.get_interface_by_name("d32")
+    irq = uart.get_interface_by_name("irq")
+
+    assert len(d32.connections) == 1
+    conn = d32.connections[0]
+
+    # Master side must be the interrupt receiver (cpu_0.d32)
+    assert conn.master_interface is d32
+    assert conn.master_module is cpu
+    # Slave side must be the interrupt sender (uart_0.irq)
+    assert conn.slave_interface is irq
+    assert conn.slave_module is uart
+
+
+def test_get_interrupts_returns_cpu_as_parent(minimal_system):
+    """_get_interrupts on uart_0 must return cpu_0 as the IRQ parent, not uart_0 itself."""
+    from sopc2dts_py.model.boardinfo import BoardInfo
+    uart = minimal_system.get_component_by_name("uart_0")
+    cpu = minimal_system.get_component_by_name("cpu_0")
+    bi = BoardInfo()
+    v_irqs: list = []
+    v_names: list = []
+    irq_parent = uart._get_interrupts(v_irqs, bi, v_names)
+    assert irq_parent is cpu, (
+        f"Expected cpu_0 as interrupt parent, got {irq_parent.instance_name if irq_parent else None}"
+    )
+    assert v_irqs == [1]
+
+
 def test_reset_connection_not_wired(minimal_system):
     # Reset connections are skipped — clk_0 should have no reset interface
     clk = minimal_system.get_component_by_name("clk_0")
