@@ -205,10 +205,9 @@ class AvalonSystem:
                     self._components.append(checked)
                     restart = True
                     break
-                # TODO (Component handlers phase): uncomment once SICBridge is ported
-                # if comp.remove_from_system_if_possible(self):
-                #     restart = True
-                #     break
+                if comp.remove_from_system_if_possible(self):
+                    restart = True
+                    break
 
     # ------------------------------------------------------------------
 

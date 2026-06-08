@@ -60,15 +60,16 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 - [x] `component_xml.py` — port component library XML loader (`sopc_components_*.xml`)
 
 ### Component handlers (`sopc2dts/components/`)
-- [ ] `base/bridge.py` — `SICBridge` + removal strategies (all / balanced / none)
-- [ ] `base/cpu.py` — `CpuComponent`
-- [ ] `base/ethernet.py` — `SICEthernet`
-- [ ] `base/flash.py` — `SICFlash`
-- [ ] `base/i2c.py` — `SICI2CMaster`
-- [ ] `base/spi.py` — `SICSpiMaster`
-- [ ] `base/gpio.py` — `GpioController`
-- [ ] `base/clock.py` — `ClockSource`
-- [ ] `base/unknown.py` — `SICUnknown` (passthrough fallback)
+- [ ] `base/SICBridge.py` — `SICBridge` + removal strategies (all / balanced / none)
+- [ ] `base/SICCpuComponent.py` — `SICCpuComponent`
+- [ ] `base/SICEthernet.py` — `SICEthernet`
+- [ ] `base/SICFlash.py` — `SICFlash`
+- [ ] `base/SICI2CMaster.py` — `SICI2CMaster`
+- [ ] `base/SICSpiMaster.py` — `SICSpiMaster`
+- [ ] `base/SICGpioController.py` — `SICGpioController`
+- [ ] `base/SICClockSource.py` — `SICClockSource`
+- [ ] `base/SICUnknown.py` — `SICUnknown` (passthrough fallback)
+- [ ] `base/SCDSelfDescribing.py` — `SCDSelfDescribing` (self-describing via embeddedsw.dts.* params)
 - [ ] `altera/hps_clocks.py` — `ClockManager`, `ClockManagerV`, `ClockManagerA10`
 - [ ] `altera/tse.py` — `SICTrippleSpeedEthernet`, `TSEMonolithic`
 - [ ] `altera/pcie.py` — `PCIeCompiler`, `PCIeRootPort`

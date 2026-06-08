@@ -201,13 +201,13 @@ class SopcComponentLib:
         fall back to a plain BasicComponent and will be replaced during the
         Component handlers phase.
         """
+        from ..components.base.SICUnknown import SICUnknown as _SICUnknown
         scd = self.get_scd_by_class_name(class_name)
+        if scd is None:
+            scd = _SICUnknown(class_name)
 
-        # TODO (Component handlers phase): wire in specialised subclasses as
-        # they are ported. Each branch below mirrors the exact check from
-        # SopcComponentLib.getComponentForClass and can be uncommented /
-        # implemented once the corresponding module is available.
-
+        # TODO (altera/arm/nxp/snps/labx handlers phase): wire in remaining
+        # specialised subclasses once those modules are ported.
         # if class_name.lower() in ("triple_speed_ethernet", "altera_eth_tse"):
         #     from ..components.altera.tse import TSEMonolithic
         #     return TSEMonolithic(class_name, instance_name, version, scd)
@@ -271,57 +271,48 @@ class SopcComponentLib:
 
         grp = (scd.group or "").lower()
 
-        # TODO: uncomment each branch once the corresponding handler is ported.
-
-        # if grp == "bridge":
-        #     from ..components.base.bridge import SICBridge
-        #     if not isinstance(comp, SICBridge):
-        #         return SICBridge(comp)
-        # elif grp == "cpu":
-        #     from ..components.base.cpu import CpuComponent
-        #     if not isinstance(comp, CpuComponent):
-        #         return CpuComponent(comp)
-        # elif grp in ("clock", "clock_source"):
-        #     from ..components.base.clock import ClockSource
-        #     if not isinstance(comp, ClockSource):
-        #         return ClockSource(comp)
-        # elif grp == "clkmgr":
-        #     if comp.class_name.lower() == "baum_clkmgr":
-        #         from ..components.altera.hps_clocks import ClockManagerA10
-        #         return ClockManagerA10(comp)
-        #     else:
-        #         from ..components.altera.hps_clocks import ClockManagerV
-        #         return ClockManagerV(comp)
-        # elif grp == "flash":
-        #     from ..components.base.flash import SICFlash
-        #     if not isinstance(comp, SICFlash):
-        #         return SICFlash(comp)
-        # elif grp == "i2c":
-        #     from ..components.base.i2c import SICI2CMaster
-        #     if not isinstance(comp, SICI2CMaster):
-        #         return SICI2CMaster(comp)
-        # elif grp == "mailbox":
-        #     from ..components.base.unknown import MailBox
-        #     if not isinstance(comp, MailBox):
-        #         return MailBox(comp)
-        # elif grp == "spi":
-        #     from ..components.base.spi import SICSpiMaster
-        #     if not isinstance(comp, SICSpiMaster):
-        #         return SICSpiMaster(comp)
-        # elif grp == "ethernet":
-        #     from ..components.base.ethernet import SICEthernet
-        #     if not isinstance(comp, SICEthernet):
-        #         return SICEthernet(comp)
-        # elif grp == "gpio":
-        #     if comp.class_name.lower() == "dw_gpio":
-        #         from ..components.snps.gpio import DwGpio
-        #         return DwGpio(comp)
-        #     else:
-        #         from ..components.base.gpio import GpioController
-        #         return GpioController(comp)
-        # elif grp == "pcie":
-        #     from ..components.altera.pcie import PCIeCompiler
-        #     return PCIeCompiler.get_pcie_component(comp)
+        if grp == "bridge":
+            from ..components.base.SICBridge import SICBridge
+            if not isinstance(comp, SICBridge):
+                return SICBridge(comp)
+        elif grp == "cpu":
+            from ..components.base.SICCpuComponent import SICCpuComponent
+            if not isinstance(comp, SICCpuComponent):
+                return SICCpuComponent(comp)
+        elif grp in ("clock", "clock_source"):
+            from ..components.base.SICClockSource import SICClockSource
+            if not isinstance(comp, SICClockSource):
+                return SICClockSource(comp)
+        elif grp == "clkmgr":
+            # TODO: altera HPS clock managers (Phase: altera handlers)
+            pass
+        elif grp == "flash":
+            from ..components.base.SICFlash import SICFlash
+            if not isinstance(comp, SICFlash):
+                return SICFlash(comp)
+        elif grp == "i2c":
+            from ..components.base.SICI2CMaster import SICI2CMaster
+            if not isinstance(comp, SICI2CMaster):
+                return SICI2CMaster(comp)
+        elif grp == "mailbox":
+            from ..components.base.SICMailBox import SICMailBox
+            if not isinstance(comp, SICMailBox):
+                return SICMailBox(comp)
+        elif grp == "spi":
+            from ..components.base.SICSpiMaster import SICSpiMaster
+            if not isinstance(comp, SICSpiMaster):
+                return SICSpiMaster(comp)
+        elif grp == "ethernet":
+            from ..components.base.SICEthernet import SICEthernet
+            if not isinstance(comp, SICEthernet):
+                return SICEthernet(comp)
+        elif grp == "gpio":
+            # TODO: DwGpio (snps handler phase)
+            from ..components.base.SICGpioController import SICGpioController
+            if not isinstance(comp, SICGpioController):
+                return SICGpioController(comp)
+        elif grp == "pcie":
+            pass  # TODO: altera PCIe handler phase
 
         return comp
 
@@ -333,27 +324,26 @@ class SopcComponentLib:
         are ported during the Component handlers phase; the required-params
         check is fully implemented.
         """
-        # TODO (Component handlers phase): uncomment once SCDSelfDescribing /
-        # SICUnknown are ported.
-        #
-        # from ..components.base.unknown import SICUnknown, SCDSelfDescribing
-        # if SCDSelfDescribing.is_self_describing(comp) and \
-        #         not isinstance(comp.scd, SCDSelfDescribing):
-        #     if isinstance(comp.scd, SICUnknown) or \
-        #             not comp.scd.is_overridden_version(comp.version):
-        #         comp.set_scd(SCDSelfDescribing(comp))
-        #         comp = self._cast_to_group_specific_object(comp)
-        #     else:
-        #         logger.info(
-        #             "Component %s of class %s is self-describing but the "
-        #             "lib-version overrides version '%s'",
-        #             comp.instance_name, comp.class_name, comp.version,
-        #         )
-        # elif isinstance(comp.scd, SICUnknown):
-        #     logger.warning(
-        #         "Component %s of class %s is unknown",
-        #         comp.instance_name, comp.class_name,
-        #     )
+        from ..components.base.SICUnknown import SICUnknown
+        from ..components.base.SCDSelfDescribing import SCDSelfDescribing
+
+        if SCDSelfDescribing.is_self_describing(comp) and \
+                not isinstance(comp.scd, SCDSelfDescribing):
+            if isinstance(comp.scd, SICUnknown) or \
+                    not (comp.scd and comp.scd.is_overridden_version(comp.version)):
+                comp.scd = SCDSelfDescribing(comp)
+                comp = self._cast_to_group_specific_object(comp)
+            else:
+                logger.info(
+                    "Component %s of class %s is self-describing but the "
+                    "lib-version overrides version '%s'",
+                    comp.instance_name, comp.class_name, comp.version,
+                )
+        elif isinstance(comp.scd, SICUnknown):
+            logger.warning(
+                "Component %s of class %s is unknown",
+                comp.instance_name, comp.class_name,
+            )
 
         # Required-params check: if the current SCD requires params this
         # component doesn't have, find a better-matching SCD.
