@@ -105,9 +105,9 @@ See [docs/TESTING.md](TESTING.md) for the full test strategy (unit → component
 **Step 1 — component tests (Phase 1 only, no generator needed)**
 - [ ] `tests/fixtures/` populated with real `.sopcinfo` files (see below)
 - [ ] `sopc_components_*.xml` files all load without errors
-- [ ] CV SoC GHRD parses cleanly; expected HPS component types present
+- [x] CV SoC GHRD parses cleanly; expected HPS component types present
 - [ ] A10 SoC GHRD parses cleanly; `ClockManagerA10` / `DwGpio` present
-- [ ] NEEK design parses cleanly; Nios II + TSE + SGDMA present
+- [x] NEEK design parses cleanly; Nios II + TSE + SGDMA present
 
 **Fixtures to acquire and commit to `tests/fixtures/`:**
 - [ ] `cv_soc_system.sopcinfo` — Cyclone V SoC GHRD (rocketboards.org, GSRD 14.x)
@@ -133,8 +133,8 @@ Goal: all output types from `-t` work and produce correct output.
 > above) can run. Port these first; the remaining generators can follow.
 
 ### Text generators (`sopc2dts_py/generators/`)
-- [ ] `dts.py` — port `DTSGenerator2` (primary output — **port first**)
-- [ ] `factory.py` — port `GeneratorFactory` (string type → generator instance — **port second**)
+- [x] `dts.py` — port `DTSGenerator2` (primary output — **port first**)
+- [x] `factory.py` — port `GeneratorFactory` (string type → generator instance — **port second**)
 - [ ] `kernel_headers.py` — port `KernelHeadersGenerator`
 - [ ] `uboot_headers.py` — port `UBootHeaderGenerator`
 - [ ] `sopc_header_imitator.py` — port `SopcCreateHeaderFilesImitator`
