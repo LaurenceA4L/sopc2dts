@@ -195,7 +195,8 @@ Goal: drop-in replacement for the Java JAR on the command line.
 - [x] Version string from `importlib.metadata`
 - [x] Exit codes match Java (0 = success, 1 = error)
 - [x] Binary output to stdout warns when stdout is a terminal
-- [ ] Makefile / `sopc2dts.sh` wrapper updated
+- [x] Makefile replaced (Java `sopc2dts.jar` targets → `install` / `test` / `venv` / `clean`)
+- [x] `sopc2dts.sh` wrapper added (auto-detects `.venv` or system Python 3.10+)
 
 ---
 
