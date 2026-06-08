@@ -25,14 +25,15 @@ if TYPE_CHECKING:
 
 class GeneratorType(Enum):
     """Port of GeneratorFactory.GeneratorType."""
-    DTS          = auto()
-    DTB          = auto()
-    DTB_IHEX8    = auto()
-    DTB_IHEX32   = auto()
-    GRAPH        = auto()
-    U_BOOT       = auto()
+    DTS            = auto()
+    DTB            = auto()
+    DTB_IHEX8      = auto()
+    DTB_IHEX32     = auto()
+    DTB_CHAR_ARR   = auto()
+    GRAPH          = auto()
+    U_BOOT         = auto()
     KERNEL_HEADERS = auto()
-    DTB_CHAR_ARR = auto()
+    SOPC_HEADER    = auto()   # SopcCreateHeaderFilesImitator (--mimic-sopc-create-header-files)
 
 
 class GeneratorFactory:
@@ -48,11 +49,26 @@ class GeneratorFactory:
     ) -> Optional[AbstractSopcGenerator]:
         """Port of GeneratorFactory.createGeneratorFor."""
         from .DTSGenerator2 import DTSGenerator2
+        from .DTBGenerator2 import DTBGenerator2
+        from .DTBHex8Generator import DTBHex8Generator
+        from .DTBHex32Generator import DTBHex32Generator
+        from .DTBCCharArray import DTBCCharArray
+        from .KernelHeadersGenerator import KernelHeadersGenerator
+        from .UBootHeaderGenerator import UBootHeaderGenerator
+        from .SopcCreateHeaderFilesImitator import SopcCreateHeaderFilesImitator
+        from .GraphGenerator import GraphGenerator
 
-        if gen_type == GeneratorType.DTS:
-            return DTSGenerator2(sys)
-        # DTB, graph, u-boot, kernel-headers: not yet ported
-        return None
+        return {
+            GeneratorType.DTS:            DTSGenerator2(sys),
+            GeneratorType.DTB:            DTBGenerator2(sys),
+            GeneratorType.DTB_IHEX8:      DTBHex8Generator(sys),
+            GeneratorType.DTB_IHEX32:     DTBHex32Generator(sys),
+            GeneratorType.DTB_CHAR_ARR:   DTBCCharArray(sys),
+            GeneratorType.KERNEL_HEADERS: KernelHeadersGenerator(sys),
+            GeneratorType.U_BOOT:         UBootHeaderGenerator(sys),
+            GeneratorType.SOPC_HEADER:    SopcCreateHeaderFilesImitator(sys),
+            GeneratorType.GRAPH:          GraphGenerator(sys),
+        }.get(gen_type)
 
     @staticmethod
     def get_type_by_name(name: str) -> Optional[GeneratorType]:

@@ -786,10 +786,11 @@ class TestGeneratorFactory:
         gen = GeneratorFactory.create_generator_for(sys, GeneratorType.DTS)
         assert gen.is_text_output()
 
-    def test_unsupported_type_returns_none(self):
+    def test_all_types_return_a_generator(self):
         sys = _minimal_system()
-        gen = GeneratorFactory.create_generator_for(sys, GeneratorType.GRAPH)
-        assert gen is None
+        for gt in GeneratorType:
+            gen = GeneratorFactory.create_generator_for(sys, gt)
+            assert gen is not None, f"GeneratorFactory returned None for {gt}"
 
     def test_get_type_by_name_dts(self):
         assert GeneratorFactory.get_type_by_name("dts") == GeneratorType.DTS
@@ -855,3 +856,258 @@ class TestGetConnectionPath:
         assert len(path) == 2
         assert path[0].slave_module is bridge
         assert path[1].slave_module is uart
+
+
+# ===========================================================================
+# DTBlob — phandle resolution and binary assembly
+# ===========================================================================
+
+class TestDTBlob:
+    def test_register_string_deduplicated(self):
+        from sopc2dts_py.model.devicetree import DTBlob
+        dtb = DTBlob()
+        off1 = dtb.register_string("hello")
+        off2 = dtb.register_string("hello")
+        off3 = dtb.register_string("world")
+        assert off1 == off2
+        assert off3 > off1
+
+    def test_get_bytes_starts_with_magic(self):
+        import struct
+        from sopc2dts_py.model.devicetree import DTBlob, DTNode
+        dtb = DTBlob()
+        root = DTNode("")
+        dtb.set_root_node(root)
+        data = dtb.get_bytes()
+        assert len(data) >= 40
+        magic, = struct.unpack_from(">I", data, 0)
+        assert magic == 0xD00DFEED
+
+    def test_get_bytes_total_size_consistent(self):
+        import struct
+        from sopc2dts_py.model.devicetree import DTBlob, DTNode, DTProperty
+        dtb = DTBlob()
+        root = DTNode("")
+        root.add_property(DTProperty.from_string("compatible", "test"))
+        dtb.set_root_node(root)
+        data = dtb.get_bytes()
+        total_size, = struct.unpack_from(">I", data, 4)
+        assert total_size == len(data)
+
+    def test_phandle_assigned_on_lookup(self):
+        from sopc2dts_py.model.devicetree import DTBlob, DTNode
+        dtb = DTBlob()
+        root = DTNode("root", label="mynode")
+        dtb.set_root_node(root)
+        ph = dtb.get_phandle("mynode")
+        assert ph == 1
+        # Second lookup returns same value
+        assert dtb.get_phandle("mynode") == 1
+
+    def test_phandle_missing_label_returns_zero(self):
+        from sopc2dts_py.model.devicetree import DTBlob, DTNode
+        dtb = DTBlob()
+        root = DTNode("root", label="mynode")
+        dtb.set_root_node(root)
+        assert dtb.get_phandle("nonexistent") == 0
+
+    def test_set_phandles_resolves_references(self):
+        from sopc2dts_py.model.devicetree import (
+            DTBlob, DTNode, DTProperty, DTPropPHandleVal, DTPropNumVal
+        )
+        dtb = DTBlob()
+        root = DTNode("/")
+        target = DTNode("target", label="tgt")
+        root.add_child(target)
+        ref_prop = DTProperty("interrupt-parent")
+        phv = DTPropPHandleVal("tgt")
+        ref_prop.add_value(phv)
+        root.add_property(ref_prop)
+        dtb.set_root_node(root)
+        dtb.set_phandles(root)
+        assert phv.phandle != 0
+
+
+# ===========================================================================
+# Bin2IHex
+# ===========================================================================
+
+class TestBin2IHex:
+    def test_i8hex_eof_record(self):
+        from sopc2dts_py.lib.bin2ihex import to_hex, HexType
+        result = to_hex(b"\x00\x01\x02", HexType.I8Hex)
+        assert result.strip().endswith(":00000001FF")
+
+    def test_i8hex_checksum(self):
+        from sopc2dts_py.lib.bin2ihex import to_hex, HexType
+        # Known: :03000000000102FA (size=3, addr=0, type=0, data=0x00,0x01,0x02, cksum=0xFA)
+        result = to_hex(b"\x00\x01\x02", HexType.I8Hex)
+        first_line = result.splitlines()[0]
+        assert first_line == ":03000000000102FA"
+
+    def test_i32hex_32bit_aligned(self):
+        from sopc2dts_py.lib.bin2ihex import to_hex, HexType, ByteOrder, AddressingMode
+        data = bytes(range(8))
+        result = to_hex(data, HexType.I32Hex, ByteOrder.LE, addr_mode=AddressingMode.AddrMode32)
+        assert ":00000001FF" in result
+
+    def test_i32hex_pads_unaligned(self):
+        from sopc2dts_py.lib.bin2ihex import to_hex, HexType, ByteOrder, AddressingMode
+        # 3 bytes — not 32-bit aligned, should pad to 4
+        result = to_hex(b"\x01\x02\x03", HexType.I32Hex, ByteOrder.LE,
+                        addr_mode=AddressingMode.AddrMode32)
+        assert ":00000001FF" in result
+
+
+# ===========================================================================
+# DTBCCharArray (built-in, no dtc needed)
+# ===========================================================================
+
+class TestDTBCCharArray:
+    def test_output_format(self):
+        """CCharArray generator must produce syntactically valid C."""
+        from sopc2dts_py.generators.DTBCCharArray import DTBCCharArray
+        from sopc2dts_py.model.devicetree import DTBlob, DTNode, DTProperty
+
+        # Patch the DTBGenerator2 dependency to return dummy bytes
+        class _FakeDTBGen:
+            def get_binary_output(self, bi):
+                return bytes(range(36))  # 36 bytes
+
+        sys = _minimal_system()
+        gen = DTBCCharArray(sys)
+        gen._dtb_gen = _FakeDTBGen()
+        bi = _make_bi()
+        result = gen.get_text_output(bi)
+        assert result is not None
+        assert result.startswith("unsigned char dtbData[] = {")
+        assert result.strip().endswith("};")
+        assert "0x00," in result
+        assert "0x23," in result  # 0x23 = 35
+
+    def test_entries_per_line(self):
+        from sopc2dts_py.generators.DTBCCharArray import DTBCCharArray
+
+        class _FakeDTBGen:
+            def get_binary_output(self, bi):
+                return bytes(24)  # 2 full lines of 12
+
+        sys = _minimal_system()
+        gen = DTBCCharArray(sys)
+        gen._dtb_gen = _FakeDTBGen()
+        bi = _make_bi()
+        result = gen.get_text_output(bi)
+        lines = result.splitlines()
+        # 2 data lines + header + footer
+        data_lines = [l for l in lines if l.startswith("\t")]
+        assert len(data_lines) == 2
+
+
+# ===========================================================================
+# KernelHeadersGenerator
+# ===========================================================================
+
+class TestKernelHeadersGenerator:
+    def test_no_cpu_returns_none(self):
+        from sopc2dts_py.generators.KernelHeadersGenerator import KernelHeadersGenerator
+        sys = _minimal_system()
+        sys.add_component(_make_comp("uart", "uart0", group="serial"))
+        bi = _make_bi()
+        gen = KernelHeadersGenerator(sys)
+        result = gen.get_text_output(bi)
+        assert result is None
+
+    def test_cpu_with_cmacro_generates_header(self):
+        from sopc2dts_py.generators.KernelHeadersGenerator import KernelHeadersGenerator
+        from sopc2dts_py.model.parameter import Parameter, DataType
+        sys = _minimal_system()
+        cpu = _make_comp("altera_nios2_qsys", "cpu0", group="cpu")
+        cpu.add_param(Parameter("embeddedsw.CMacro.CPU_FREQ", "50000000", DataType.UNSIGNED))
+        sys.add_component(cpu)
+        bi = _make_bi()
+        gen = KernelHeadersGenerator(sys)
+        result = gen.get_text_output(bi)
+        assert result is not None
+        assert "#ifndef _ALTERA_CPU_H_" in result
+        assert "#define CPU_FREQ\t50000000" in result
+        assert "#endif" in result
+
+
+# ===========================================================================
+# GraphGenerator
+# ===========================================================================
+
+class TestGraphGenerator:
+    def test_produces_digraph(self):
+        from sopc2dts_py.generators.GraphGenerator import GraphGenerator
+        sys = _build_nios2_system()
+        bi = _make_bi("cpu0")
+        gen = GraphGenerator(sys)
+        result = gen.get_text_output(bi)
+        assert result is not None
+        assert result.startswith("digraph sopc2dot {")
+        assert result.strip().endswith("}")
+
+    def test_all_components_mentioned(self):
+        from sopc2dts_py.generators.GraphGenerator import GraphGenerator
+        sys = _build_nios2_system()
+        bi = _make_bi("cpu0")
+        gen = GraphGenerator(sys)
+        result = gen.get_text_output(bi)
+        assert "cpu0" in result
+        assert "jtag_uart0" in result
+        assert "sdram0" in result
+
+    def test_memory_mapped_edges_in_blue(self):
+        from sopc2dts_py.generators.GraphGenerator import GraphGenerator
+        sys = _build_nios2_system()
+        bi = _make_bi("cpu0")
+        gen = GraphGenerator(sys)
+        result = gen.get_text_output(bi)
+        assert 'color="blue"' in result
+
+
+# ===========================================================================
+# SopcCreateHeaderFilesImitator
+# ===========================================================================
+
+class TestSopcCreateHeaderFilesImitator:
+    def test_no_pov_dumps_all_non_bridge(self):
+        from sopc2dts_py.generators.SopcCreateHeaderFilesImitator import (
+            SopcCreateHeaderFilesImitator,
+        )
+        from sopc2dts_py.model.parameter import Parameter, DataType
+        sys = _minimal_system()
+        comp = _make_comp("uart", "uart0", group="serial")
+        comp.add_param(Parameter("embeddedsw.CMacro.BAUD", "115200", DataType.UNSIGNED))
+        sys.add_component(comp)
+        bi = _make_bi(pov=None)
+        gen = SopcCreateHeaderFilesImitator(sys)
+        result = gen.get_text_output(bi)
+        assert result is not None
+        assert "#ifndef _ALTERA_CPU_H_" in result
+        assert "UART0_BAUD" in result
+
+    def test_pov_specified_uses_guard(self):
+        from sopc2dts_py.generators.SopcCreateHeaderFilesImitator import (
+            SopcCreateHeaderFilesImitator,
+        )
+        sys = _build_nios2_system()
+        bi = _make_bi(pov="cpu0")
+        gen = SopcCreateHeaderFilesImitator(sys)
+        result = gen.get_text_output(bi)
+        assert result is not None
+        assert "_ALTERA_CPU0_H_" in result
+
+    def test_bridge_group_excluded(self):
+        from sopc2dts_py.generators.SopcCreateHeaderFilesImitator import (
+            SopcCreateHeaderFilesImitator,
+        )
+        sys = _minimal_system()
+        bridge = _make_comp("hps_bridge", "bridge0", group="bridge")
+        sys.add_component(bridge)
+        bi = _make_bi(pov=None)
+        gen = SopcCreateHeaderFilesImitator(sys)
+        result = gen.get_text_output(bi)
+        # Bridge group excluded → nothing to emit
+        assert result is None

@@ -442,16 +442,38 @@ class DTNode(DTElement):
 
 class DTBlob:
     """
-    Manages the FDT string table and overall binary blob.
-    Stub for Phase 2 — only register_string and put_u32 are needed by
-    DTNode/DTProperty.get_bytes() which are already used in tests.
+    FDT binary serialiser.
+    Port of sopc2dts.lib.devicetree.DTBlob.
+
+    Builds a valid Flattened Device Tree (DTB) blob from a DTNode tree.
+    Also used as the string-table registry by DTNode/DTProperty.get_bytes().
     """
 
-    FDT_MAGIC = 0xD00DFEED
+    FDT_MAGIC          = 0xD00DFEED
+    DTB_VERSION        = 17
+    DTB_COMPAT_VERSION = 16
+    OF_DT_END          = 0x09
+    HEADER_SIZE        = 40
 
-    def __init__(self) -> None:
+    def __init__(self, phandle_offset: int = 0) -> None:
+        self._next_phandle: int = phandle_offset + 1
         self._string_table: bytes = b""
         self._string_offsets: dict = {}
+        self._root_node: Optional["DTNode"] = None
+
+    # ------------------------------------------------------------------
+    # Root node
+    # ------------------------------------------------------------------
+
+    def set_root_node(self, node: "DTNode") -> None:
+        self._root_node = node
+
+    def get_root_node(self) -> Optional["DTNode"]:
+        return self._root_node
+
+    # ------------------------------------------------------------------
+    # String table (used by DTProperty.get_bytes during serialisation)
+    # ------------------------------------------------------------------
 
     def register_string(self, s: str) -> int:
         """Add s to the string table if not present; return its offset."""
@@ -465,6 +487,85 @@ class DTBlob:
     @property
     def string_table(self) -> bytes:
         return self._string_table
+
+    # ------------------------------------------------------------------
+    # Phandle management
+    # ------------------------------------------------------------------
+
+    def get_phandle(self, label: str) -> int:
+        """Return (creating if needed) the phandle for the node with the given label."""
+        if self._root_node is None:
+            return 0
+        return self._find_or_assign_phandle(label, self._root_node)
+
+    def _find_or_assign_phandle(self, label: str, node: "DTNode") -> int:
+        if label and label == node.label:
+            prop = node.get_property_by_name("linux,phandle")
+            if prop is None:
+                ph = self._next_phandle
+                self._next_phandle += 1
+                p = DTProperty("linux,phandle")
+                p.add_value(DTPropNumVal(ph))
+                node.add_property(p)
+                return ph
+            else:
+                v = prop.values[0] if prop.values else None
+                return int(v.val) if v is not None else 0
+        for child in node.children:
+            ph = self._find_or_assign_phandle(label, child)
+            if ph != 0:
+                return ph
+        return 0
+
+    def set_phandles(self, node: "DTNode") -> None:
+        """Walk tree, resolving all DTPropPHandleVal labels to numeric phandles."""
+        for prop in node.properties:
+            for val in prop.values:
+                if isinstance(val, DTPropPHandleVal):
+                    val.phandle = self.get_phandle(val.label)
+        for child in node.children:
+            self.set_phandles(child)
+
+    # ------------------------------------------------------------------
+    # Binary assembly
+    # ------------------------------------------------------------------
+
+    def get_bytes(self) -> bytes:
+        """Assemble and return the complete DTB binary blob."""
+        if self._root_node is None:
+            raise ValueError("DTBlob has no root node")
+        mrm = self._get_mem_reserve_map()
+        self.set_phandles(self._root_node)
+        dt = self._get_dt()
+        strings = self._string_table
+        total_size = self.HEADER_SIZE + len(mrm) + len(dt) + len(strings)
+        out = struct.pack(
+            ">IIIIIIIIII",
+            self.FDT_MAGIC,
+            total_size,
+            self.HEADER_SIZE + len(mrm),            # off_dt_struct
+            self.HEADER_SIZE + len(mrm) + len(dt),  # off_dt_strings
+            self.HEADER_SIZE,                        # off_mem_rsvmap
+            self.DTB_VERSION,
+            self.DTB_COMPAT_VERSION,
+            0xFEEDBEEF,                             # boot_cpuid_phys
+            len(strings),                           # size_dt_strings
+            len(dt),                                # size_dt_struct
+        )
+        return out + mrm + dt + strings
+
+    def _get_dt(self) -> bytes:
+        dt = self._root_node.get_bytes(self)
+        return dt + struct.pack(">I", self.OF_DT_END)
+
+    @staticmethod
+    def _get_mem_reserve_map() -> bytes:
+        """Empty memory reservation map: one all-zero sentinel entry."""
+        return struct.pack(">QQ", 0, 0)
+
+    # ------------------------------------------------------------------
+    # Static helpers (used by DTNode/DTProperty serialisation)
+    # ------------------------------------------------------------------
 
     @staticmethod
     def put_u32(val: int, buf: bytearray, offset: int) -> None:

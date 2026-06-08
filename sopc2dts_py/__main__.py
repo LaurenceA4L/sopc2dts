@@ -57,8 +57,24 @@ def build_parser() -> argparse.ArgumentParser:
         dest="output_type",
         metavar="type",
         default="dts",
-        choices=["dtb", "dtb-hex8", "dtb-hex32", "dtb-char-arr", "dts", "uboot", "kernel"],
-        help="Output type (default: dts)",
+        choices=[
+            "dts",
+            "dtb",
+            "dtb-ihex8",
+            "dtb-ihex32",
+            "dtb-char-arr",
+            "kernel",
+            "uboot",
+            "sopc-header",
+            "graph",
+        ],
+        help=(
+            "Output type (default: dts). "
+            "dts=devicetree source, dtb=binary blob (requires dtc), "
+            "dtb-ihex8/ihex32=Intel hex, dtb-char-arr=C char array, "
+            "kernel=kernel CMacro header, uboot=U-Boot header, "
+            "sopc-header=sopc-create-header-files imitator, graph=Graphviz dot"
+        ),
     )
     p.add_argument(
         "-p", "--pov",
