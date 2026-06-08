@@ -383,6 +383,13 @@ class DTNode(DTElement):
                 return p
         return None
 
+    def remove_property(self, prop: DTProperty) -> None:
+        """Remove a property from this node (no-op if not present)."""
+        try:
+            self._properties.remove(prop)
+        except ValueError:
+            pass
+
     @property
     def properties(self) -> List[DTProperty]:
         return self._properties

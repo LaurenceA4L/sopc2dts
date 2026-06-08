@@ -10,14 +10,13 @@
 
 """
 Port of sopc2dts.lib.components.base.SICCpuComponent.
-Renamed SICSICCpuComponent to carry the SOPC Info Component prefix consistently.
 """
 
 from __future__ import annotations
 
 from typing import List, Optional, TYPE_CHECKING
 
-from ...model.component import BasicComponent, SopcComponentDescription
+from ...model.component import BasicComponent
 
 if TYPE_CHECKING:
     from ...model.connection import Connection
@@ -29,9 +28,9 @@ _SMP_BLACKLIST = frozenset(["altera_nios2", "altera_nios2_qsys"])
 
 class SICCpuComponent(BasicComponent):
     """
-    A CPU component instance.  Tracks cpu_index so the reg property emits
+    A CPU component instance. Tracks cpu_index so the reg property emits
     the hart/CPU ID rather than a memory address.
-    Port of sopc2dts.lib.components.base.SICCpuComponent.
+    Port of sopc2dts.lib.components.base.CpuComponent.
     """
 
     def __init__(self, comp: BasicComponent) -> None:
@@ -48,14 +47,28 @@ class SICCpuComponent(BasicComponent):
         self.cpu_index: int = 0
 
     # ------------------------------------------------------------------
-    # Address helpers (mirrors Java getReg / getAddrFromConnection)
+    # Address/reg overrides (port of Java CpuComponent)
     # ------------------------------------------------------------------
 
-    def _get_addr_from_conn(self, conn: Optional["Connection"]) -> List[int]:
-        """When conn is None (no parent bus), return [cpu_index] as the address."""
+    def _get_addr_from_connection(self, conn: Optional["Connection"]) -> List[int]:
+        """When conn is None (standalone cpu@ node), address = cpu_index."""
         if conn is None:
             return [self.cpu_index]
         return list(conn.conn_value) if conn.conn_value else [0]
+
+    def _get_reg(self, master, v_reg_names: List[str]) -> List[int]:
+        """When master is None, reg = [cpu_index]."""
+        if master is None:
+            return [self.cpu_index]
+        return super()._get_reg(master, v_reg_names)
+
+    # ------------------------------------------------------------------
+    # DT node
+    # ------------------------------------------------------------------
+
+    def to_dt_node(self, board_info: object, conn: Optional["Connection"]) -> object:
+        """Port of CpuComponent — delegates to BasicComponent after overriding addr helpers."""
+        return super().to_dt_node(board_info, conn)
 
     # ------------------------------------------------------------------
     # SMP helpers
@@ -67,18 +80,7 @@ class SICCpuComponent(BasicComponent):
             return False
         if not self.scd.is_supporting_class_name(other.class_name):
             return False
-        # Blacklisted uni-processors cannot form SMP
         for bl in _SMP_BLACKLIST:
             if self.scd.is_supporting_class_name(bl):
                 return False
         return True
-
-    # ------------------------------------------------------------------
-    # DT node (Phase 2)
-    # ------------------------------------------------------------------
-
-    def to_dt_node(self, board_info: object, conn: Optional["Connection"]) -> object:
-        # Phase 2: super().to_dt_node needs to be implemented first.
-        # SICCpuComponent overrides getReg/getAddrFromConnection so that when
-        # conn is None, the address cell is cpu_index rather than 0.
-        raise NotImplementedError("SICCpuComponent.to_dt_node — Phase 2")

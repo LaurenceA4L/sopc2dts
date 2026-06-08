@@ -77,6 +77,36 @@ class AvalonSystem:
         """Components that have at least one memory-mapped master interface."""
         return [c for c in self._components if c.has_memory_master()]
 
+    def get_connection_path(
+        self,
+        master: BasicComponent,
+        slave: BasicComponent,
+        dt: SystemDataType,
+    ) -> List:
+        """
+        Find the connection path from master to slave through dt-type bus.
+        Returns list of Connection objects (possibly traversing bridges),
+        or empty list if no path found.
+        Port of AvalonSystem.getConnectionPath.
+        """
+        from collections import deque
+        queue: deque = deque([(master, [])])
+        visited: set = {id(master)}
+        while queue:
+            current, path = queue.popleft()
+            for conn in current.get_connections(dt, True):
+                slave_comp = conn.slave_module
+                if slave_comp is None:
+                    continue
+                new_path = path + [conn]
+                if slave_comp is slave:
+                    return new_path
+                if id(slave_comp) not in visited:
+                    visited.add(id(slave_comp))
+                    if slave_comp.scd.group == "bridge":
+                        queue.append((slave_comp, new_path))
+        return []
+
     # ------------------------------------------------------------------
     # Version helpers (mirrors AvalonSystem.setVersion / getVersion)
     # ------------------------------------------------------------------

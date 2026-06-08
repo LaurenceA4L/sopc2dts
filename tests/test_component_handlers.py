@@ -172,7 +172,7 @@ class TestSICCpuComponent:
         base = _make_comp("altera_nios2", "cpu_0")
         cpu = SICCpuComponent(base)
         cpu.cpu_index = 2
-        assert cpu._get_addr_from_conn(None) == [2]
+        assert cpu._get_addr_from_connection(None) == [2]
 
     def test_addr_from_conn_uses_conn_value(self):
         base_cpu = _make_comp("altera_nios2", "cpu_0")
@@ -182,7 +182,7 @@ class TestSICCpuComponent:
         s_intf = _make_intf("s1", SystemDataType.MEMORY_MAPPED, False, base_slave)
         conn = Connection(m_intf, s_intf, SystemDataType.MEMORY_MAPPED, connect=True)
         conn.conn_value = [0x100]
-        assert cpu._get_addr_from_conn(conn) == [0x100]
+        assert cpu._get_addr_from_connection(conn) == [0x100]
 
     def test_is_smp_capable_same_arm(self):
         b1 = _make_comp("arm_a9", "cpu_0", SopcComponentDescription("arm_a9", "cpu"))

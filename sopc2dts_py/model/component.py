@@ -613,11 +613,276 @@ class BasicComponent(BasicElement):
         return False
 
     # ------------------------------------------------------------------
-    # DT generation — implemented in Phase 2
+    # DT generation helpers
+    # ------------------------------------------------------------------
+
+    def _get_addr_from_connection(self, conn: Optional["Connection"]) -> List[int]:
+        """Port of BasicComponent.getAddrFromConnection."""
+        if conn is None or conn.conn_value is None:
+            return [0]
+        return list(conn.conn_value)
+
+    def _get_addr_from_connection_str(self, conn: Optional["Connection"]) -> str:
+        """Port of BasicComponent.getAddrFromConnectionStr."""
+        tmp = self._get_addr_from_connection(conn)
+        if not tmp:
+            return "0"
+        res = format(tmp[0], 'x')          # first cell: no leading zeros
+        for i in range(1, len(tmp)):
+            res += f"{tmp[i]:08x}"         # subsequent cells: zero-padded
+        return res
+
+    def _get_reg(
+        self,
+        master: Optional["BasicComponent"],
+        v_reg_names: List[str],
+    ) -> List[int]:
+        """Port of BasicComponent.getReg."""
+        v_regs: List[int] = []
+        for intf in self._interfaces:
+            if not intf.is_memory_slave():
+                continue
+            conn = None
+            for c in intf.connections:
+                if master is None or c.master_module is master:
+                    conn = c
+                    break
+            if conn is not None:
+                v_regs.extend(self._get_addr_from_connection(conn))
+                if intf.interface_value:
+                    v_regs.extend(intf.interface_value)
+                v_reg_names.append(intf.name)
+        return v_regs
+
+    def _get_interrupt_parent(
+        self,
+        intf: "Interface",
+        board_info: object,
+    ) -> Optional["BasicComponent"]:
+        """Port of BasicComponent.getInterruptParent."""
+        from ..log import logger
+        irq_parent = None
+        for c in intf.connections:
+            master = c.master_module
+            if master is not None and board_info.is_valid_irq_master(master):  # type: ignore[attr-defined]
+                if irq_parent is None:
+                    irq_parent = master
+                else:
+                    logger.warning(
+                        "%s.%s: Multiple interrupt parents not supported. Using %s, not %s (%s)",
+                        intf.owner.instance_name, intf.name,
+                        irq_parent.instance_name,
+                        master.instance_name, master.class_name,
+                    )
+        return irq_parent
+
+    def _get_interrupts(
+        self,
+        v_irqs: List[int],
+        board_info: object,
+        v_irq_names: List[str],
+    ) -> Optional["BasicComponent"]:
+        """Port of BasicComponent.getInterrupts."""
+        from ..log import logger
+        irq_parent = None
+        for intf in self._interfaces:
+            if not intf.is_irq_slave():
+                continue
+            irqp = self._get_interrupt_parent(intf, board_info)
+            if irqp is None:
+                continue
+            if irq_parent is None:
+                irq_parent = irqp
+            elif irq_parent is not irqp:
+                logger.warning(
+                    "%s: Multiple interrupt parents per component not supported.",
+                    self.instance_name,
+                )
+            for c in intf.connections:
+                if c.master_module is irq_parent:
+                    if c.conn_value:
+                        v_irqs.extend(c.conn_value)
+                    v_irq_names.append(intf.name)
+        return irq_parent
+
+    def get_clock_master_ph(self, cm: "Interface") -> List["DTPropVal"]:
+        """Port of BasicComponent.getClockMasterPH."""
+        from .devicetree import DTPropPHandleVal, DTPropNumVal
+        v_cms = self.get_interfaces(SystemDataType.CLOCK, True)
+        phv = DTPropPHandleVal(self.instance_name)
+        if len(v_cms) == 1:
+            return [phv]
+        for i, intf in enumerate(v_cms):
+            if intf is cm:
+                return [phv, DTPropNumVal(i)]
+        return []
+
+    def get_clocks_property(self) -> List["DTProperty"]:
+        """Port of BasicComponent.getClocksProperty."""
+        from .devicetree import DTProperty
+        clock_slaves = self.get_interfaces(SystemDataType.CLOCK, False)
+        if not clock_slaves:
+            return []
+        prop = DTProperty("clocks")
+        v_names: List[str] = []
+        for cs in clock_slaves:
+            if not cs.connections:
+                continue
+            first_conn = cs.connections[0]
+            mcomp = first_conn.master_module
+            if mcomp is None:
+                continue
+            if mcomp.scd.group.lower() == "ignore":
+                continue
+            mi = first_conn.master_interface
+            if mi is None:
+                continue
+            for phv in mcomp.get_clock_master_ph(mi):
+                prop.add_value(phv)
+            v_names.append(cs.name)
+        if not v_names:
+            return []
+        result: List[DTProperty] = [prop]
+        if len(v_names) > 1:
+            result.append(DTProperty.from_strings("clock-names", v_names))
+        return result
+
+    def _create_fixed_prop(self, ap: "SICAutoParam") -> Optional["DTProperty"]:
+        """Port of BasicComponent.createFixedProp."""
+        from .devicetree import DTProperty
+        if ap.fixed_value is None or ap.force_type is None:
+            return None
+        try:
+            if ap.force_type.lower() == "unsigned":
+                return DTProperty.from_long(ap.dts_name, int(ap.fixed_value))
+            elif ap.force_type.lower() == "string":
+                return DTProperty.from_string(ap.dts_name, ap.fixed_value)
+        except (ValueError, TypeError):
+            pass
+        return None
+
+    # ------------------------------------------------------------------
+    # DT generation — main entry
     # ------------------------------------------------------------------
 
     def to_dt_node(self, board_info: object, conn: Optional["Connection"]) -> "DTNode":
-        raise NotImplementedError("to_dt_node not yet implemented — Phase 2")
+        """Full port of BasicComponent.toDTNode."""
+        from .devicetree import (
+            DTNode, DTProperty, DTPropPHandleVal, DTPropNumVal,
+        )
+        from .parameter import Parameter
+
+        node = DTNode(
+            self.scd.group + "@" + self._get_addr_from_connection_str(conn),
+            label=self.instance_name,
+        )
+
+        grp = self.scd.group.lower()
+        if grp in ("cpu", "memory"):
+            node.add_property(DTProperty.from_string("device_type", grp))
+
+        # compatible strings
+        comp_prop_string = DTProperty.from_strings(
+            "compatible", self.scd.get_compatibles(self.version)
+        )
+        node.add_property(comp_prop_string)
+
+        # reg property
+        v_reg_names: List[str] = []
+        master = conn.master_module if conn is not None else None
+        v_regs = self._get_reg(master, v_reg_names)
+        if v_regs:
+            p_reg = DTProperty("reg")
+            p_reg.add_hex_values(v_regs)
+            width = 2
+            if conn is not None and conn.master_interface is not None:
+                mi = conn.master_interface
+                width = mi.primary_width + mi.secondary_width
+            p_reg.set_num_values_per_row(width)
+            node.add_property(p_reg)
+            if len(v_reg_names) > 1 and node.get_property_by_name("reg-names") is None:
+                node.add_property(DTProperty.from_strings("reg-names", v_reg_names))
+
+        # interrupts
+        v_irqs: List[int] = []
+        v_irq_names: List[str] = []
+        irq_parent = self._get_interrupts(v_irqs, board_info, v_irq_names)
+        if irq_parent is not None:
+            ip_prop = DTProperty("interrupt-parent")
+            ip_prop.add_value(DTPropPHandleVal(irq_parent.instance_name))
+            node.add_property(ip_prop)
+            p_irq = DTProperty("interrupts")
+            p_irq.add_number_values(v_irqs)
+            node.add_property(p_irq)
+            if len(v_irq_names) > 1:
+                node.add_property(DTProperty.from_strings("interrupt-names", v_irq_names))
+
+        # interrupt-controller
+        if self.is_interrupt_master():
+            node.add_property(DTProperty("interrupt-controller"))
+            irq_masters = self.get_interfaces(SystemDataType.INTERRUPT, True)
+            if irq_masters:
+                node.add_property(
+                    DTProperty.from_long(
+                        "#interrupt-cells", irq_masters[0].get_primary_width()
+                    )
+                )
+
+        # clocks
+        if board_info.is_show_clock_tree():  # type: ignore[attr-defined]
+            for clk_prop in self.get_clocks_property():
+                node.add_property(clk_prop)
+
+        # SCD auto-params
+        v_param_todo = list(self._parameters)
+        for ap in self.scd.get_auto_params():
+            bp = self.get_param_by_name(ap.sopc_info_name or "")
+            if bp is not None:
+                dt = Parameter.data_type_by_name(ap.force_type)
+                prop = bp.to_dt_property(ap.dts_name, dt)
+                if prop is not None:
+                    node.add_property(prop)
+                try:
+                    v_param_todo.remove(bp)
+                except ValueError:
+                    pass
+            elif (ap.dts_name or "").lower() == "clock-frequency":
+                node.add_property(DTProperty.from_long("clock-frequency", self.get_clock_rate()))
+            elif (ap.dts_name or "").lower() == "regstep":
+                node.add_property(DTProperty.from_long("regstep", 4))
+            elif ap.fixed_value is not None:
+                prop = self._create_fixed_prop(ap)
+                if prop is not None:
+                    node.add_property(prop)
+
+        # embeddedsw / remaining params
+        for bp in v_param_todo:
+            ass_name: Optional[str] = bp.name
+            if ass_name is None:
+                continue
+            if ass_name.lower() == self.EMBSW_DTS_COMPAT.lower():
+                vals = bp.value.split()
+                comp_prop_string.add_string_values(vals)
+                ass_name = None
+            elif ass_name.startswith(self.EMBSW_DTS_PARAMS):
+                ass_name = ass_name[len(self.EMBSW_DTS_PARAMS):]
+                prop = bp.to_dt_property(ass_name)
+                if prop is not None:
+                    node.add_property(prop, replace_existing=True)
+                ass_name = None
+            elif (ass_name.startswith(self.EMBSW_CMACRO)
+                  and board_info.get_dump_parameters() != ParameterAction.NONE):  # type: ignore[attr-defined]
+                ass_name = ass_name[len(self.EMBSW_CMACRO):]
+            else:
+                ass_name = None
+
+            if ass_name is not None:
+                ass_name = ass_name.replace('_', '-')
+                prop = bp.to_dt_property(self.scd.vendor + ',' + ass_name)
+                if prop is not None:
+                    node.add_property(prop)
+
+        return node
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.instance_name!r}, {self.class_name!r})"
