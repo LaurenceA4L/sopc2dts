@@ -1,4 +1,4 @@
-<BoardInfo pov="cpu">
+<BoardInfo pov="cpu_0">
 <FlashPartitions chip="ext_flash">
 	<Partition name="fpga" address="0x20000" size="0x160000">
 		<readonly></readonly></Partition>

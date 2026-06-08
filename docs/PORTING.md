@@ -103,16 +103,18 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 See [docs/TESTING.md](TESTING.md) for the full test strategy (unit → component → golden diff).
 
 **Step 1 — component tests (Phase 1 only, no generator needed)**
-- [ ] `tests/fixtures/` populated with real `.sopcinfo` files (see below)
-- [ ] `sopc_components_*.xml` files all load without errors
+- [x] `tests/fixtures/` populated with real `.sopcinfo` files (see below)
+- [x] `sopc_components_*.xml` files all load without errors
 - [x] CV SoC GHRD parses cleanly; expected HPS component types present
 - [ ] A10 SoC GHRD parses cleanly; `ClockManagerA10` / `DwGpio` present
 - [x] NEEK design parses cleanly; Nios II + TSE + SGDMA present
 
 **Fixtures to acquire and commit to `tests/fixtures/`:**
-- [ ] `cv_soc_system.sopcinfo` — Cyclone V SoC GHRD (rocketboards.org, GSRD 14.x)
+- [x] `cv_soc_ghrd.sopcinfo` — Cyclone V SoC GHRD
+- [x] `de0_nano_soc_ghrd.sopcinfo` — DE0-Nano SoC GHRD
+- [x] `neek.sopcinfo` — NEEK reference design (synthetic, pairs with `boardinfo_neek.xml`)
+- [x] `boardinfo_neek.xml` — original bundled board file (`pov` corrected to `cpu_0` for fixture)
 - [ ] `a10_soc_system.sopcinfo` — Arria 10 SoC GHRD (rocketboards.org)
-- [ ] `neek.sopcinfo` — NEEK reference design (pairs with `boardinfo_neek.xml`)
 - [ ] `synthetic_vip.sopcinfo` — hand-crafted, covers `VIPFrameBuffer` / `VIPMixer`
 - [ ] `synthetic_pcie.sopcinfo` — hand-crafted, covers `PCIeRootPort`
 - [ ] `synthetic_labx.sopcinfo` — hand-crafted, covers `LabXEthernet` / ISP1xxx / LAN91C111
@@ -204,29 +206,44 @@ Goal: drop-in replacement for the Java JAR on the command line.
 
 Goal: `sopc2dts --gui` opens a functional browser UI equivalent to the Swing GUI.
 
-### Server (`sopc2dts/gui/`)
-- [ ] `app.py` — FastAPI app with uvicorn launcher
-- [ ] `launcher.py` — finds free port, starts server, calls `webbrowser.open(url)`
-- [ ] `__main__.py` wires `--gui` flag to `launcher.py`
+> **Implementation note:** single-file FastAPI + HTMX approach chosen over the
+> original multi-template plan.  No frontend framework — dark-theme monospace UI,
+> server-side rendering via HTMX partial swaps.
 
-### Templates (`sopc2dts/gui/templates/`)
-- [ ] `base.html` — layout, nav tabs, HTMX + minimal CSS (no framework)
-- [ ] `input.html` — file picker for `.sopcinfo` / `.qsys`, component list (HTMX swap)
-- [ ] `boardinfo.html` — port of `BoardInfoPanel` tabs (General, Ethernet, I2C, SPI, Flash)
-- [ ] `output.html` — output type selector, POV picker, generate button, preview pane
-- [ ] `log.html` — streaming log via SSE (`/log/stream` endpoint)
+### Server (`sopc2dts_py/gui/`)
+- [x] `app.py` — FastAPI app (routes, state singleton, log capture)
+- [x] `launcher.py` — finds free port, starts uvicorn in main thread, opens browser in background thread
+- [x] `__init__.py` — exposes `launch()`
+- [x] `__main__.py` wires `--gui` flag to `launcher.launch()`
+
+### Template (`sopc2dts_py/gui/templates/`)
+- [x] `index.html` — single-page dark UI (HTMX 1.9, no framework)
+  - Input section: sopcinfo path + board XML path, both with Load buttons
+  - System section: component table (instance / class / group), HTMX-swapped on load
+  - Generate section: output type, POV, sort, show-clocks, no-timestamp
+  - Output section: textarea with Copy button + named download link
+  - Log section: SSE stream, Clear button, auto-scroll toggle
 
 ### API routes
-- [ ] `POST /system/load` — parse input file, return component list fragment
-- [ ] `POST /boardinfo/load` — parse boardinfo XML, return populated form
-- [ ] `POST /generate` — run generator, return text/binary result
-- [ ] `GET /generate/download` — serve binary output as file download
-- [ ] `GET /log/stream` — SSE endpoint for live log output
+- [x] `GET /health` — launcher readiness poll
+- [x] `POST /load` — parse sopcinfo/qsys, return system fragment
+- [x] `POST /load-board` — parse boardinfo XML, return status + OOB POV field update
+- [x] `POST /generate` — run generator, return output textarea or binary download link
+- [x] `GET /download` — serve last output as named file attachment
+- [x] `GET /log/stream` — SSE endpoint for live log (keepalive every 250 ms)
+
+### Polish
+- [x] Package version wired to generated DTS header (no more "version unknown")
+- [x] Generated header updated: Walter's credit + Python port attribution + GitHub URL
+- [x] Board file POV auto-fills generate form via HTMX OOB swap
+- [x] Download filename uses system name (e.g. `neek.dts` not `output.dts`)
+- [x] Known bug #1 logged: Ctrl+C unreliable on Windows/PowerShell (workaround: close browser tab)
 
 ### Verification
-- [ ] Manual smoke test: load `boardinfo_neek.xml`, generate DTS, verify output matches CLI
-- [ ] Log panel streams messages in real time
-- [ ] Binary download works (DTB)
+- [x] Manual smoke test: load `neek.sopcinfo` + `tests/fixtures/boardinfo_neek.xml`, generate DTS
+- [x] Log panel streams messages in real time
+- [x] Binary download works (DTB hex)
+- [x] `tests/fixtures/boardinfo_neek.xml` added (original bundled file, `pov` corrected to `cpu_0`)
 
 ---
 
