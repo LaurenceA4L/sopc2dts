@@ -99,9 +99,29 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 - [x] `nxp/USBHostControllerISP1xxx.py` — `USBHostControllerISP1xxx`
 
 ### Verification
-- [ ] Test against `boardinfo_neek.xml` + bundled `sopc_components_*.xml` files
-- [ ] Diff output against Java tool output for at least one real `.sopcinfo` file
-- [ ] All existing component XML files load without errors
+
+See [docs/TESTING.md](TESTING.md) for the full test strategy (unit → component → golden diff).
+
+**Step 1 — component tests (Phase 1 only, no generator needed)**
+- [ ] `tests/fixtures/` populated with real `.sopcinfo` files (see below)
+- [ ] `sopc_components_*.xml` files all load without errors
+- [ ] CV SoC GHRD parses cleanly; expected HPS component types present
+- [ ] A10 SoC GHRD parses cleanly; `ClockManagerA10` / `DwGpio` present
+- [ ] NEEK design parses cleanly; Nios II + TSE + SGDMA present
+
+**Fixtures to acquire and commit to `tests/fixtures/`:**
+- [ ] `cv_soc_system.sopcinfo` — Cyclone V SoC GHRD (rocketboards.org, GSRD 14.x)
+- [ ] `a10_soc_system.sopcinfo` — Arria 10 SoC GHRD (rocketboards.org)
+- [ ] `neek.sopcinfo` — NEEK reference design (pairs with `boardinfo_neek.xml`)
+- [ ] `synthetic_vip.sopcinfo` — hand-crafted, covers `VIPFrameBuffer` / `VIPMixer`
+- [ ] `synthetic_pcie.sopcinfo` — hand-crafted, covers `PCIeRootPort`
+- [ ] `synthetic_labx.sopcinfo` — hand-crafted, covers `LabXEthernet` / ISP1xxx / LAN91C111
+
+**Step 2 — golden diff tests (requires Phase 2 DTS generator)**
+- [ ] Java reference `.dts` files generated and committed to `tests/golden/`
+- [ ] Python output matches Java output for CV SoC GHRD (whitespace-normalised)
+- [ ] Python output matches Java output for A10 SoC GHRD
+- [ ] Python output matches Java output for NEEK design
 
 ---
 
@@ -109,8 +129,12 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 
 Goal: all output types from `-t` work and produce correct output.
 
-### Text generators (`sopc2dts/generators/`)
-- [ ] `dts.py` — port `DTSGenerator2` (primary output)
+> **Gate:** `dts.py` + `factory.py` must land before golden diff tests (Step 2
+> above) can run. Port these first; the remaining generators can follow.
+
+### Text generators (`sopc2dts_py/generators/`)
+- [ ] `dts.py` — port `DTSGenerator2` (primary output — **port first**)
+- [ ] `factory.py` — port `GeneratorFactory` (string type → generator instance — **port second**)
 - [ ] `kernel_headers.py` — port `KernelHeadersGenerator`
 - [ ] `uboot_headers.py` — port `UBootHeaderGenerator`
 - [ ] `sopc_header_imitator.py` — port `SopcCreateHeaderFilesImitator`
@@ -122,9 +146,6 @@ Goal: all output types from `-t` work and produce correct output.
 - [ ] `dtb_hex32.py` — port `DTBHex32Generator`
 - [ ] `dtb_char_array.py` — port `DTBCCharArray`
 - [ ] `bin2ihex.py` — port `Bin2IHex`
-
-### Generator factory
-- [ ] `factory.py` — port `GeneratorFactory` (string type → generator instance)
 
 ### Verification
 - [ ] Round-trip test: `.sopcinfo` → DTB → decompile with `dtc` → compare to DTS output
