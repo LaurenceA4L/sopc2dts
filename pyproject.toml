@@ -47,4 +47,7 @@ Homepage = "https://github.com/LaurenceA4L/sopc2dts"
 where = ["."]
 include = ["sopc2dts_py*"]
 
+[tool.setuptools.package-data]
+"sopc2dts_py.gui" = ["templates/*.html"]
+
 [tool.setuptools_scm]

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sopc2dts</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: monospace;
+      font-size: 14px;
+      margin: 0;
+      padding: 1em 2em;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+
+    h1 { margin: 0 0 0.5em; color: #9cdcfe; font-size: 1.4em; }
+    h2 { color: #9cdcfe; margin: 0 0 0.5em; font-size: 1.1em; }
+    h3 { color: #9cdcfe; margin: 0.8em 0 0.4em; font-size: 1em; }
+
+    section {
+      border: 1px solid #3c3c3c;
+      border-radius: 4px;
+      padding: 1em;
+      margin-bottom: 1em;
+    }
+
+    input[type="text"], select {
+      background: #2d2d2d;
+      border: 1px solid #555;
+      color: #d4d4d4;
+      padding: 4px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    input[type="text"] { width: 60%; }
+
+    button {
+      background: #0e639c;
+      color: #fff;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    button:hover { background: #1177bb; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.5em 0;
+    }
+    th, td { border: 1px solid #3c3c3c; padding: 4px 8px; text-align: left; }
+    th { background: #2d2d2d; color: #9cdcfe; }
+
+    details summary { cursor: pointer; color: #9cdcfe; margin-bottom: 0.5em; }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 0.8em;
+      margin-bottom: 0.5em;
+    }
+    .row label:first-child { width: 120px; color: #9cdcfe; flex-shrink: 0; }
+
+    textarea {
+      width: 100%;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border: 1px solid #3c3c3c;
+      border-radius: 3px;
+      padding: 0.5em;
+      font-family: monospace;
+      font-size: 13px;
+      resize: vertical;
+    }
+
+    .err { color: #f48771; }
+
+    a { color: #9cdcfe; }
+
+    hr { border: none; border-top: 1px solid #3c3c3c; margin: 0.8em 0; }
+
+    code { color: #ce9178; }
+
+    /* HTMX loading indicator */
+    .htmx-indicator { display: none; color: #9cdcfe; }
+    .htmx-request .htmx-indicator { display: inline; }
+
+    /* Log panel */
+    #log-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    #log-list li { padding: 1px 0; border-bottom: 1px solid #2a2a2a; }
+    #log-list li.err-line { color: #f48771; }
+    #log-list li.warn-line { color: #dcdcaa; }
+  </style>
+</head>
+<body>
+
+<h1>sopc2dts</h1>
+
+<!-- ── Input ─────────────────────────────────────────── -->
+<section>
+  <h2>Input</h2>
+  <form hx-post="/load" hx-target="#system-section" hx-swap="innerHTML"
+        hx-indicator="#load-spinner">
+    <div class="row">
+      <label>sopcinfo / .qsys</label>
+      <input type="text" name="input_path"
+             value="{{ prefill_input }}"
+             placeholder="/path/to/system.sopcinfo">
+      <button type="submit">Load</button>
+      <span id="load-spinner" class="htmx-indicator">&#x23F3; loading…</span>
+    </div>
+  </form>
+</section>
+
+<!-- ── System + Generate ──────────────────────────────── -->
+<section>
+  <div id="system-section">
+    {% if system_html %}
+      {{ system_html | safe }}
+    {% else %}
+      <p>No system loaded.</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ── Output ─────────────────────────────────────────── -->
+<section>
+  <h2>Output</h2>
+  <div id="output-section">
+    <p>No output yet.</p>
+  </div>
+</section>
+
+<!-- ── Log ────────────────────────────────────────────── -->
+<section>
+  <h2>Log</h2>
+  <ul id="log-list"></ul>
+</section>
+
+<script>
+  // SSE log stream — append messages to the log panel
+  const logList = document.getElementById("log-list");
+  const MAX_LOG_LINES = 200;
+
+  const es = new EventSource("/log/stream");
+  es.onmessage = (e) => {
+    if (!e.data || e.data.trim() === "") return;
+    const li = document.createElement("li");
+    li.textContent = e.data;
+    if (e.data.includes("ERROR")) li.classList.add("err-line");
+    else if (e.data.includes("WARNING")) li.classList.add("warn-line");
+    logList.appendChild(li);
+    // Cap list length
+    while (logList.children.length > MAX_LOG_LINES) {
+      logList.removeChild(logList.firstChild);
+    }
+    logList.scrollTop = logList.scrollHeight;
+  };
+</script>
+
+</body>
+</html>
