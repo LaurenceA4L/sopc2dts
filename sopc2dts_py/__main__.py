@@ -287,9 +287,12 @@ def _run_cli(args) -> None:
     # ------------------------------------------------------------------
     bi = BoardInfo()
 
+    if len(args.board) > 1:
+        logger.debug("Multiple --board files specified; only the last one takes effect")
     for board_file in args.board:
         try:
             bi = load_boardinfo(board_file)
+            logger.info("Loaded boardinfo: %s", board_file)
         except Exception as exc:
             logger.error("Failed to load boardinfo '%s': %s", board_file, exc)
             sys.exit(1)
@@ -328,6 +331,14 @@ def _run_cli(args) -> None:
 
     param_map = {"all": ParameterAction.ALL, "cmacro": ParameterAction.CMACRO}
     bi._dump_parameters = param_map.get(args.sopc_parameters, ParameterAction.NONE)
+
+    if args.bridge_ranges:
+        bi.set_ranges_style(args.bridge_ranges)
+
+    # -m implies sopc-header type if no explicit type was given
+    if args.mimic_altera and args.output_type == "dts":
+        args.output_type = "sopc-header"
+        logger.info("-m flag: switching output type to sopc-header")
 
     # ------------------------------------------------------------------
     # 4. Bridge removal strategy
@@ -384,6 +395,12 @@ def _run_cli(args) -> None:
             sys.exit(1)
     else:
         if isinstance(output, bytes):
+            if sys.stdout.isatty():
+                logger.warning(
+                    "Binary output (%s) written to stdout. "
+                    "Use -o <file> to save to a file.",
+                    args.output_type,
+                )
             sys.stdout.buffer.write(output)
         else:
             sys.stdout.write(output)

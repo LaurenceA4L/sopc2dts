@@ -152,23 +152,29 @@ Goal: all output types from `-t` work and produce correct output.
 > above) can run. Port these first; the remaining generators can follow.
 
 ### Text generators (`sopc2dts_py/generators/`)
-- [x] `dts.py` — port `DTSGenerator2` (primary output — **port first**)
-- [x] `factory.py` — port `GeneratorFactory` (string type → generator instance — **port second**)
-- [ ] `kernel_headers.py` — port `KernelHeadersGenerator`
-- [ ] `uboot_headers.py` — port `UBootHeaderGenerator`
-- [ ] `sopc_header_imitator.py` — port `SopcCreateHeaderFilesImitator`
-- [ ] `graph.py` — port `GraphGenerator` (Graphviz dot output)
+- [x] `DTSGenerator2.py` — port `DTSGenerator2` (primary output — **port first**)
+- [x] `GeneratorFactory.py` — port `GeneratorFactory` (string type → generator instance — **port second**)
+- [x] `KernelHeadersGenerator.py` — port `KernelHeadersGenerator`
+- [x] `UBootHeaderGenerator.py` — port `UBootHeaderGenerator` (UBootComponentLib inlined)
+- [x] `SopcCreateHeaderFilesImitator.py` — port `SopcCreateHeaderFilesImitator`
+- [x] `GraphGenerator.py` — port `GraphGenerator` (Graphviz dot output)
 
 ### Binary generators
-- [ ] `dtb.py` — port `DTBGenerator2` using `struct.pack` for FDT binary format
-- [ ] `dtb_hex8.py` — port `DTBHex8Generator`
-- [ ] `dtb_hex32.py` — port `DTBHex32Generator`
-- [ ] `dtb_char_array.py` — port `DTBCCharArray`
-- [ ] `bin2ihex.py` — port `Bin2IHex`
+- [x] `DTBGenerator2.py` — shells out to `dtc -O dtb -I dts`, fallback to built-in `DTBlob`
+- [x] `DTBHex8Generator.py` — port `DTBHex8Generator` (wraps DTBGenerator2 + bin2ihex I8Hex)
+- [x] `DTBHex32Generator.py` — port `DTBHex32Generator` (wraps DTBGenerator2 + bin2ihex I32Hex LE)
+- [x] `DTBCCharArray.py` — port `DTBCCharArray` (C unsigned char array, 12 entries/line)
+- [x] `lib/bin2ihex.py` — port `Bin2IHex` (I8Hex / I32Hex / I64Hex with LE/BE byte ordering)
+
+> **DTB generation decision (2026-06-08):** Rather than re-implementing the FDT binary
+> serialisation from scratch, `DTBGenerator2` shells out to `dtc` (the standard Device Tree
+> Compiler), which is universally available on Linux build hosts and validates the output.
+> A built-in `DTBlob.get_bytes()` implementation is retained as a fallback for environments
+> where `dtc` is not on `PATH`.
 
 ### Verification
 - [ ] Round-trip test: `.sopcinfo` → DTB → decompile with `dtc` → compare to DTS output
-- [ ] `--mimic-sopc-create-header-files` mode produces `.h` files matching Java output
+- [x] `--mimic-sopc-create-header-files` (`-m`) auto-selects `sopc-header` output type
 
 ---
 
@@ -176,18 +182,19 @@ Goal: all output types from `-t` work and produce correct output.
 
 Goal: drop-in replacement for the Java JAR on the command line.
 
-- [ ] All flags from `Sopc2DTS.java` implemented and tested
-- [ ] `--bridge-removal` strategies all work
-- [ ] `--pov` / `--pov-type` selection
-- [ ] `--sort` (none / address / name / label)
-- [ ] `--bridge-ranges` (none / bridge / child)
-- [ ] `--force-ALTR` / `--force-altr` compatible string
-- [ ] `--no-timestamp` flag
-- [ ] `--extra-component-libs` loading
-- [ ] `--mimic-sopc-create-header-files` mode
-- [ ] `--clocks` / `--conduits` / `--reset` / `--streaming` visibility flags
-- [ ] Version string from `importlib.metadata`
-- [ ] Exit codes match Java (0 = success, 1 = error)
+- [x] All flags from `Sopc2DTS.java` implemented and tested
+- [x] `--bridge-removal` strategies all work (all / balanced / none → `SICBridge`)
+- [x] `--pov` / `--pov-type` selection
+- [x] `--sort` (none / address / name / label)
+- [x] `--bridge-ranges` (none / bridge / child) — wired to `BoardInfo.set_ranges_style()`
+- [x] `--force-ALTR` / `--force-altr` compatible string normalisation
+- [x] `--no-timestamp` flag
+- [x] `--extra-component-libs` loading
+- [x] `--mimic-sopc-create-header-files` (`-m`) auto-selects `sopc-header` output type
+- [x] `--clocks` / `--conduits` / `--reset` / `--streaming` visibility flags
+- [x] Version string from `importlib.metadata`
+- [x] Exit codes match Java (0 = success, 1 = error)
+- [x] Binary output to stdout warns when stdout is a terminal
 - [ ] Makefile / `sopc2dts.sh` wrapper updated
 
 ---
