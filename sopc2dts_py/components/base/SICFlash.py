@@ -12,9 +12,9 @@
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
-from ...model.component import BasicComponent
+from ...model.component import BasicComponent, SopcComponentDescription
 
 if TYPE_CHECKING:
     from ...model.connection import Connection
@@ -24,19 +24,27 @@ class SICFlash(BasicComponent):
     """
     Flash memory component — adds bank-width and partition sub-nodes.
     Port of sopc2dts.lib.components.base.SICFlash.
+
+    Accepts both copy-constructor style (SICFlash(comp)) and regular
+    constructor style (SICFlash(class_name, instance_name, version, scd)).
     """
 
-    def __init__(self, comp: BasicComponent) -> None:
-        super().__init__(
-            comp.class_name,
-            comp.instance_name,
-            comp.version,
-            comp.scd,
-        )
-        self._parameters = comp._parameters
-        self._interfaces = comp._interfaces
-        for intf in self._interfaces:
-            intf.owner = self
+    def __init__(
+        self,
+        comp_or_class_name: Union[BasicComponent, str],
+        instance_name: Optional[str] = None,
+        version: Optional[str] = None,
+        scd: Optional[SopcComponentDescription] = None,
+    ) -> None:
+        if isinstance(comp_or_class_name, BasicComponent):
+            comp = comp_or_class_name
+            super().__init__(comp.class_name, comp.instance_name, comp.version, comp.scd)
+            self._parameters = comp._parameters
+            self._interfaces = comp._interfaces
+            for intf in self._interfaces:
+                intf.owner = self
+        else:
+            super().__init__(comp_or_class_name, instance_name, version or "", scd)
 
     def get_bank_width(self) -> int:
         """Port of SICFlash.getBankWidth — default 2 bytes (16-bit)."""

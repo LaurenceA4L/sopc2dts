@@ -206,53 +206,53 @@ class SopcComponentLib:
         if scd is None:
             scd = _SICUnknown(class_name)
 
-        # TODO (altera/arm/nxp/snps/labx handlers phase): wire in remaining
-        # specialised subclasses once those modules are ported.
-        # if class_name.lower() in ("triple_speed_ethernet", "altera_eth_tse"):
-        #     from ..components.altera.tse import TSEMonolithic
-        #     return TSEMonolithic(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_avalon_sgdma":
-        #     from ..components.altera.sgdma import SICSgdma
-        #     return SICSgdma(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_avalon_epcs_flash_controller":
-        #     from ..components.altera.epcs import SICEpcs
-        #     return SICEpcs(class_name, instance_name, version)
-        # elif class_name.lower() == "altera_avalon_lan91c111":
-        #     from ..components.altera.misc import SICLan91c111
-        #     return SICLan91c111(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_avalon_video_sync_generator":
-        #     from ..components.altera.misc import VIPFrameBuffer
-        #     return VIPFrameBuffer(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_interface_generator":
-        #     from ..components.altera.misc import InterfaceGenerator
-        #     return InterfaceGenerator(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_arria10_interface_generator":
-        #     from ..components.altera.misc import A10InterfaceGenerator
-        #     return A10InterfaceGenerator(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_irq_bridge":
-        #     from ..components.altera.misc import InterruptBridge
-        #     return InterruptBridge(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "interrupt_latency_counter":
-        #     from ..components.altera.misc import InterruptLatencyCounter
-        #     return InterruptLatencyCounter(class_name, instance_name, version, scd)
-        # elif class_name.lower() in ("alt_vip_mix", "alt_vip_switch"):
-        #     from ..components.altera.misc import VIPMixer
-        #     return VIPMixer(class_name, instance_name, version, scd)
-        # elif class_name.lower() in ("isp116x", "isp1362_ctrl"):
-        #     from ..components.nxp.usb import USBHostControllerISP1xxx
-        #     return USBHostControllerISP1xxx(class_name, instance_name, version, scd)
-        # elif class_name.lower() == "altera_generic_tristate_controller":
-        #     from ..components.altera.misc import GenericTristateController
-        #     return GenericTristateController(class_name, instance_name, version)
-        # elif class_name.lower().endswith("arm_gic"):
-        #     from ..components.arm.gic import CortexA9GIC
-        #     return CortexA9GIC(instance_name, version)
-        # elif class_name.lower() == "labx_ethernet":
-        #     from ..components.labx.ethernet import LabXEthernet
-        #     return LabXEthernet(class_name, instance_name, version, scd)
-        # elif class_name.lower().endswith("hps_bridge_avalon"):
-        #     from ..components.altera.misc import MultiBridge
-        #     return MultiBridge(class_name, instance_name, version, scd)
+        cn = class_name.lower()
+
+        if cn in ("triple_speed_ethernet", "altera_eth_tse"):
+            from ..components.altera.TSEMonolithic import TSEMonolithic
+            return TSEMonolithic(class_name, instance_name, version, scd)
+        elif cn == "altera_avalon_sgdma":
+            from ..components.altera.SICSgdma import SICSgdma
+            return SICSgdma(class_name, instance_name, version, scd)
+        elif cn == "altera_avalon_epcs_flash_controller":
+            from ..components.altera.SICEpcs import SICEpcs
+            return SICEpcs(class_name, instance_name, version)
+        elif cn == "altera_avalon_lan91c111":
+            from ..components.altera.SICLan91c111 import SICLan91c111
+            return SICLan91c111(class_name, instance_name, version, scd)
+        elif cn == "altera_avalon_video_sync_generator":
+            from ..components.altera.VIPFrameBuffer import VIPFrameBuffer
+            return VIPFrameBuffer(class_name, instance_name, version, scd)
+        elif cn == "altera_interface_generator":
+            from ..components.altera.InterfaceGenerator import InterfaceGenerator
+            return InterfaceGenerator(class_name, instance_name, version, scd)
+        elif cn == "altera_arria10_interface_generator":
+            from ..components.altera.A10InterfaceGenerator import A10InterfaceGenerator
+            return A10InterfaceGenerator(class_name, instance_name, version, scd)
+        elif cn == "altera_irq_bridge":
+            from ..components.altera.InterruptBridge import InterruptBridge
+            return InterruptBridge(class_name, instance_name, version, scd)
+        elif cn == "interrupt_latency_counter":
+            from ..components.altera.InterruptLatencyCounter import InterruptLatencyCounter
+            return InterruptLatencyCounter(class_name, instance_name, version, scd)
+        elif cn in ("alt_vip_mix", "alt_vip_switch"):
+            from ..components.altera.VIPMixer import VIPMixer
+            return VIPMixer(class_name, instance_name, version, scd)
+        elif cn in ("isp116x", "isp1362_ctrl"):
+            from ..components.nxp.USBHostControllerISP1xxx import USBHostControllerISP1xxx
+            return USBHostControllerISP1xxx(class_name, instance_name, version, scd)
+        elif cn == "altera_generic_tristate_controller":
+            from ..components.altera.GenericTristateController import GenericTristateController
+            return GenericTristateController(class_name, instance_name, version)
+        elif cn.endswith("arm_gic"):
+            from ..components.arm.CortexA9GIC import CortexA9GIC
+            return CortexA9GIC(instance_name, version)
+        elif cn == "labx_ethernet":
+            from ..components.labx.LabXEthernet import LabXEthernet
+            return LabXEthernet(class_name, instance_name, version, scd)
+        elif cn.endswith("hps_bridge_avalon"):
+            from ..components.altera.MultiBridge import MultiBridge
+            return MultiBridge(class_name, instance_name, version, scd)
 
         comp = BasicComponent(class_name, instance_name, version, scd)
         return self._cast_to_group_specific_object(comp)
@@ -261,9 +261,6 @@ class SopcComponentLib:
         """
         Promote a generic BasicComponent to a group-specific subclass based
         on the group field of its SCD. Port of castToGroupSpecificObject.
-
-        NOTE — specialised subclasses are stubs until the Component handlers
-        phase; each branch is commented with a TODO.
         """
         scd = comp.scd
         if scd is None:
@@ -284,8 +281,15 @@ class SopcComponentLib:
             if not isinstance(comp, SICClockSource):
                 return SICClockSource(comp)
         elif grp == "clkmgr":
-            # TODO: altera HPS clock managers (Phase: altera handlers)
-            pass
+            from ..components.altera.hps.ClockManager import ClockManager
+            if not isinstance(comp, ClockManager):
+                # Java: "baum_clkmgr" → A10, anything else → V
+                if comp.class_name.lower() == "baum_clkmgr":
+                    from ..components.altera.hps.ClockManagerA10 import ClockManagerA10
+                    return ClockManagerA10(comp)
+                else:
+                    from ..components.altera.hps.ClockManagerV import ClockManagerV
+                    return ClockManagerV(comp)
         elif grp == "flash":
             from ..components.base.SICFlash import SICFlash
             if not isinstance(comp, SICFlash):
@@ -307,12 +311,15 @@ class SopcComponentLib:
             if not isinstance(comp, SICEthernet):
                 return SICEthernet(comp)
         elif grp == "gpio":
-            # TODO: DwGpio (snps handler phase)
             from ..components.base.SICGpioController import SICGpioController
             if not isinstance(comp, SICGpioController):
+                if comp.class_name.lower() == "dw_gpio":
+                    from ..components.snps.DwGpio import DwGpio
+                    return DwGpio(comp)
                 return SICGpioController(comp)
         elif grp == "pcie":
-            pass  # TODO: altera PCIe handler phase
+            from ..components.altera.PCIeCompiler import PCIeCompiler
+            return PCIeCompiler.get_pcie_component(comp)
 
         return comp
 

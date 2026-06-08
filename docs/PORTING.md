@@ -60,26 +60,43 @@ Goal: `sopc2dts -i foo.sopcinfo -o foo.dts` produces identical output in Python.
 - [x] `component_xml.py` — port component library XML loader (`sopc_components_*.xml`)
 
 ### Component handlers (`sopc2dts/components/`)
-- [ ] `base/SICBridge.py` — `SICBridge` + removal strategies (all / balanced / none)
-- [ ] `base/SICCpuComponent.py` — `SICCpuComponent`
-- [ ] `base/SICEthernet.py` — `SICEthernet`
-- [ ] `base/SICFlash.py` — `SICFlash`
-- [ ] `base/SICI2CMaster.py` — `SICI2CMaster`
-- [ ] `base/SICSpiMaster.py` — `SICSpiMaster`
-- [ ] `base/SICGpioController.py` — `SICGpioController`
-- [ ] `base/SICClockSource.py` — `SICClockSource`
-- [ ] `base/SICUnknown.py` — `SICUnknown` (passthrough fallback)
-- [ ] `base/SCDSelfDescribing.py` — `SCDSelfDescribing` (self-describing via embeddedsw.dts.* params)
-- [ ] `altera/hps_clocks.py` — `ClockManager`, `ClockManagerV`, `ClockManagerA10`
-- [ ] `altera/tse.py` — `SICTrippleSpeedEthernet`, `TSEMonolithic`
-- [ ] `altera/pcie.py` — `PCIeCompiler`, `PCIeRootPort`
-- [ ] `altera/sgdma.py` — `SICSgdma`
-- [ ] `altera/epcs.py` — `SICEpcs`
-- [ ] `altera/misc.py` — `InterruptBridge`, `MultiBridge`, `GenericTristateController`, etc.
-- [ ] `arm/gic.py` — `CortexA9GIC`
-- [ ] `snps/gpio.py` — `DwGpio`
-- [ ] `labx/ethernet.py` — `LabXEthernet`
-- [ ] `nxp/usb.py` — `USBHostControllerISP1xxx`
+- [x] `base/SICBridge.py` — `SICBridge` + removal strategies (all / balanced / none)
+- [x] `base/SICCpuComponent.py` — `SICCpuComponent`
+- [x] `base/SICEthernet.py` — `SICEthernet`
+- [x] `base/SICFlash.py` — `SICFlash`
+- [x] `base/SICI2CMaster.py` — `SICI2CMaster`
+- [x] `base/SICSpiMaster.py` — `SICSpiMaster`
+- [x] `base/SICGpioController.py` — `SICGpioController`
+- [x] `base/SICClockSource.py` — `SICClockSource`
+- [x] `base/SICUnknown.py` — `SICUnknown` (passthrough fallback)
+- [x] `base/SCDSelfDescribing.py` — `SCDSelfDescribing` (self-describing via embeddedsw.dts.* params)
+- [x] `base/InterruptReceiver.py` — `InterruptReceiver` (abstract IRQ bridge base)
+- [x] `altera/hps/VirtualClockElement.py` — `VirtualClockElement`
+- [x] `altera/hps/SocFpgaPeripClock.py` — `SocFpgaPeripClock`
+- [x] `altera/hps/SocFpgaGateClock.py` — `SocFpgaGateClock`
+- [x] `altera/hps/SocFpgaPllClock.py` — `SocFpgaPllClock`
+- [x] `altera/hps/ClockManager.py` — `ClockManager` (abstract HPS clock manager base)
+- [x] `altera/hps/ClockManagerV.py` — `ClockManagerV` (Cyclone V / Arria 5)
+- [x] `altera/hps/ClockManagerA10.py` — `ClockManagerA10` (Arria 10)
+- [x] `altera/SICTrippleSpeedEthernet.py` — `SICTrippleSpeedEthernet`
+- [x] `altera/TSEMonolithic.py` — `TSEMonolithic`
+- [x] `altera/PCIeCompiler.py` — `PCIeCompiler` (static factory)
+- [x] `altera/PCIeRootPort.py` — `PCIeRootPort`
+- [x] `altera/SICSgdma.py` — `SICSgdma`
+- [x] `altera/SICEpcs.py` — `SICEpcs`
+- [x] `altera/SICLan91c111.py` — `SICLan91c111`
+- [x] `altera/InterruptBridge.py` — `InterruptBridge`
+- [x] `altera/InterruptLatencyCounter.py` — `InterruptLatencyCounter`
+- [x] `altera/MultiBridge.py` — `MultiBridge`
+- [x] `altera/GenericTristateController.py` — `GenericTristateController`
+- [x] `altera/InterfaceGenerator.py` — `InterfaceGenerator`
+- [x] `altera/A10InterfaceGenerator.py` — `A10InterfaceGenerator`
+- [x] `altera/VIPFrameBuffer.py` — `VIPFrameBuffer`
+- [x] `altera/VIPMixer.py` — `VIPMixer`
+- [x] `arm/CortexA9GIC.py` — `CortexA9GIC`
+- [x] `snps/DwGpio.py` — `DwGpio`
+- [x] `labx/LabXEthernet.py` — `LabXEthernet`
+- [x] `nxp/USBHostControllerISP1xxx.py` — `USBHostControllerISP1xxx`
 
 ### Verification
 - [ ] Test against `boardinfo_neek.xml` + bundled `sopc_components_*.xml` files

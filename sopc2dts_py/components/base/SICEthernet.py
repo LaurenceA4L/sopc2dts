@@ -13,9 +13,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, Union, TYPE_CHECKING
 
-from ...model.component import BasicComponent
+from ...model.component import BasicComponent, SopcComponentDescription
 from ...model.enums import SystemDataType
 
 if TYPE_CHECKING:
@@ -34,19 +34,27 @@ class SICEthernet(BasicComponent):
     """
     Ethernet component — adds MAC address, PHY mode, and frame size properties.
     Port of sopc2dts.lib.components.base.SICEthernet.
+
+    Accepts both copy-constructor style (SICEthernet(comp)) and regular
+    constructor style (SICEthernet(class_name, instance_name, version, scd)).
     """
 
-    def __init__(self, comp: BasicComponent) -> None:
-        super().__init__(
-            comp.class_name,
-            comp.instance_name,
-            comp.version,
-            comp.scd,
-        )
-        self._parameters = comp._parameters
-        self._interfaces = comp._interfaces
-        for intf in self._interfaces:
-            intf.owner = self
+    def __init__(
+        self,
+        comp_or_class_name: Union[BasicComponent, str],
+        instance_name: Optional[str] = None,
+        version: Optional[str] = None,
+        scd: Optional[SopcComponentDescription] = None,
+    ) -> None:
+        if isinstance(comp_or_class_name, BasicComponent):
+            comp = comp_or_class_name
+            super().__init__(comp.class_name, comp.instance_name, comp.version, comp.scd)
+            self._parameters = comp._parameters
+            self._interfaces = comp._interfaces
+            for intf in self._interfaces:
+                intf.owner = self
+        else:
+            super().__init__(comp_or_class_name, instance_name, version or "", scd)
         self._phy_mode: PhyMode = PhyMode.NONE
 
     def get_address_bits(self) -> int:

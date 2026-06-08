@@ -99,6 +99,10 @@ class AvalonSystem:
     def version_minor(self) -> int:
         return getattr(self, "_version_minor", 0)
 
+    def add_system_component(self, comp: BasicComponent) -> None:
+        """Add a dynamically-created virtual component (e.g. HPS clock nodes)."""
+        self._components.append(comp)
+
     def remove_component(self, comp: BasicComponent) -> bool:
         try:
             self._components.remove(comp)
