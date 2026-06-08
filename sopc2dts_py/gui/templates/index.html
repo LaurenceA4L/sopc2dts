@@ -82,6 +82,8 @@
     }
 
     .err { color: #f48771; }
+    .ok  { color: #4ec9b0; }
+    .dim { color: #808080; }
 
     a { color: #9cdcfe; }
 
@@ -123,6 +125,28 @@
              placeholder="/path/to/system.sopcinfo">
       <button type="submit">Load</button>
       <span id="load-spinner" class="htmx-indicator">&#x23F3; loading…</span>
+    </div>
+  </form>
+
+  <form hx-post="/load-board" hx-target="#board-status" hx-swap="innerHTML"
+        hx-indicator="#board-spinner">
+    <div class="row">
+      <label>Board file</label>
+      <input type="text" name="board_path"
+             value="{{ boardinfo_path }}"
+             placeholder="/path/to/board.xml  (leave blank for defaults)">
+      <button type="submit">Load</button>
+      <span id="board-spinner" class="htmx-indicator">&#x23F3; loading…</span>
+    </div>
+    <div class="row">
+      <label></label>
+      <span id="board-status" class="dim">
+        {%- if boardinfo_path %}
+          <span class="ok">&#x2713; {{ boardinfo_path | e }}</span>
+        {%- else %}
+          Using default board settings.
+        {%- endif %}
+      </span>
     </div>
   </form>
 </section>

@@ -33,8 +33,9 @@ from fastapi.templating import Jinja2Templates
 class _AppState:
     def __init__(self) -> None:
         self.prefill_input: str = ""
-        self.system = None       # AvalonSystem | None
-        self.boardinfo = None    # BoardInfo | None  (None = use fresh default)
+        self.system = None          # AvalonSystem | None
+        self.boardinfo = None       # BoardInfo | None  (None = use fresh default)
+        self.boardinfo_path: str = ""  # last successfully loaded board file
         self.last_output: Optional[bytes | str] = None
         self.last_output_type: str = "dts"
 
@@ -89,6 +90,7 @@ async def index(request: Request) -> HTMLResponse:
         "index.html",
         {
             "prefill_input": state.prefill_input,
+            "boardinfo_path": state.boardinfo_path,
             "system_html": _render_system_html() if state.system else "",
         },
     )
@@ -101,6 +103,28 @@ async def load(input_path: str = Form(...)) -> HTMLResponse:
     if err:
         return HTMLResponse(f'<p class="err">Error: {err}</p>')
     return HTMLResponse(_render_system_html())
+
+
+@app.post("/load-board", response_class=HTMLResponse)
+async def load_board(board_path: str = Form(...)) -> HTMLResponse:
+    """Load a boardinfo XML file and return a status fragment."""
+    board_path = board_path.strip()
+    if not board_path:
+        # Clear board — revert to default
+        state.boardinfo = None
+        state.boardinfo_path = ""
+        return HTMLResponse('<span class="ok">Using default board settings.</span>')
+
+    p = Path(board_path)
+    if not p.exists():
+        return HTMLResponse(f'<span class="err">File not found: {board_path}</span>')
+    try:
+        from ..parsers import load_boardinfo  # noqa: PLC0415
+        state.boardinfo = load_boardinfo(str(p))
+        state.boardinfo_path = board_path
+        return HTMLResponse(f'<span class="ok">&#x2713; Loaded: {p.name}</span>')
+    except Exception as exc:  # noqa: BLE001
+        return HTMLResponse(f'<span class="err">Error: {exc}</span>')
 
 
 @app.post("/generate", response_class=HTMLResponse)
