@@ -218,10 +218,159 @@ def main() -> None:
 
 
 def _run_cli(args) -> None:
+    from pathlib import Path
+
+    from .model.system import AvalonSystem
+    from .model.boardinfo import BoardInfo, AltrStyle, PovType, SortType
+    from .model.enums import ParameterAction
+    from .model.component_lib import SopcComponentLib
+    from .parsers import (
+        load_system,
+        load_boardinfo,
+        load_component_lib,
+        load_component_libs_in_dir,
+    )
+    from .generators.GeneratorFactory import GeneratorFactory
+    from .components.base.SICBridge import SICBridge
+
     logger.info("sopc2dts %s", __version__)
-    # TODO Phase 1: wire up parsers, model, generators
-    logger.error("CLI generation not yet implemented — work in progress.")
-    sys.exit(1)
+    AvalonSystem.set_sopc2dts_version(__version__)
+
+    # ------------------------------------------------------------------
+    # 1. Load component libraries
+    # ------------------------------------------------------------------
+    # Bundled XMLs sit alongside the package root (repo root in dev).
+    # TODO: move XMLs into sopc2dts_py/data/ and use importlib.resources
+    lib_dir = Path(__file__).parent.parent
+    try:
+        lib = load_component_libs_in_dir(lib_dir)
+        logger.debug("Component library loaded from %s", lib_dir)
+    except Exception as exc:
+        logger.warning("Could not load bundled component libraries: %s", exc)
+        lib = SopcComponentLib.get_instance()
+
+    for extra in args.extra_component_libs:
+        try:
+            load_component_lib(extra, lib)
+            logger.info("Loaded extra component lib: %s", extra)
+        except Exception as exc:
+            logger.error("Failed to load extra component lib '%s': %s", extra, exc)
+
+    # ------------------------------------------------------------------
+    # 2. Parse input file
+    # ------------------------------------------------------------------
+    try:
+        system = load_system(args.input)
+    except Exception as exc:
+        logger.error("Failed to parse '%s': %s", args.input, exc)
+        sys.exit(1)
+    logger.info("Parsed system '%s' (%d components)", system.name, len(system.components))
+
+    # ------------------------------------------------------------------
+    # 3. Build BoardInfo
+    # ------------------------------------------------------------------
+    bi = BoardInfo()
+
+    for board_file in args.board:
+        try:
+            bi = load_boardinfo(board_file)
+        except Exception as exc:
+            logger.error("Failed to load boardinfo '%s': %s", board_file, exc)
+            sys.exit(1)
+
+    # Apply CLI overrides — these beat whatever the boardinfo file said
+    if args.pov:
+        bi.set_pov(args.pov)
+    bi.set_pov_type(PovType.PCI if args.pov_type == "pci" else PovType.CPU)
+
+    if args.sort:
+        sort_map = {
+            "none":    SortType.NONE,
+            "address": SortType.ADDRESS,
+            "name":    SortType.NAME,
+            "label":   SortType.LABEL,
+        }
+        bi.set_sort_type(sort_map.get(args.sort, SortType.NONE))
+
+    if args.bootargs:
+        bi.boot_args = args.bootargs
+    if args.exclude_timestamp:
+        bi.include_time = False
+    if args.show_clocks:
+        bi.show_clock_tree = True
+    if args.show_conduits:
+        bi.show_conduits = True
+    if args.show_reset:
+        bi.show_resets = True
+    if args.show_streaming:
+        bi.show_streaming = True
+
+    if args.force_altr_upper:
+        bi._altr_style = AltrStyle.FORCE_UPPER
+    elif args.force_altr_lower:
+        bi._altr_style = AltrStyle.FORCE_LOWER
+
+    param_map = {"all": ParameterAction.ALL, "cmacro": ParameterAction.CMACRO}
+    bi._dump_parameters = param_map.get(args.sopc_parameters, ParameterAction.NONE)
+
+    # ------------------------------------------------------------------
+    # 4. Bridge removal strategy
+    # ------------------------------------------------------------------
+    SICBridge.set_removal_strategy(args.bridge_removal.upper())
+
+    # ------------------------------------------------------------------
+    # 5. Post-parse cleanup
+    # ------------------------------------------------------------------
+    system.recheck_components()
+
+    # ------------------------------------------------------------------
+    # 6. Select generator
+    # ------------------------------------------------------------------
+    gen_type = GeneratorFactory.get_type_by_name(args.output_type)
+    if gen_type is None:
+        logger.error("Unknown output type '%s'", args.output_type)
+        sys.exit(1)
+
+    generator = GeneratorFactory.create_generator_for(system, gen_type)
+    if generator is None:
+        logger.error("Output type '%s' is not yet implemented.", args.output_type)
+        sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # 7. Generate
+    # ------------------------------------------------------------------
+    try:
+        if generator.is_text_output():
+            output = generator.get_text_output(bi)
+        else:
+            output = generator.get_binary_output(bi)
+    except Exception as exc:
+        logger.error("Generation failed: %s", exc)
+        sys.exit(1)
+
+    if output is None:
+        logger.error("Generator returned no output.")
+        sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # 8. Write output
+    # ------------------------------------------------------------------
+    if args.output:
+        out_path = Path(args.output)
+        try:
+            if isinstance(output, bytes):
+                out_path.write_bytes(output)
+            else:
+                out_path.write_text(output, encoding="utf-8")
+            logger.info("Written to %s", out_path)
+        except OSError as exc:
+            logger.error("Failed to write '%s': %s", args.output, exc)
+            sys.exit(1)
+    else:
+        if isinstance(output, bytes):
+            sys.stdout.buffer.write(output)
+        else:
+            sys.stdout.write(output)
 
 
 def _run_gui(args) -> None:
