@@ -24,12 +24,6 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-gui = [
-    "fastapi>=0.111",
-    "uvicorn[standard]>=0.29",
-    "jinja2>=3.1",
-    "python-multipart>=0.0.9",
-]
 dev = [
     "pytest>=8",
     "ruff>=0.4",
@@ -47,7 +41,5 @@ Homepage = "https://github.com/LaurenceA4L/sopc2dts"
 where = ["."]
 include = ["sopc2dts_py*"]
 
-[tool.setuptools.package-data]
-"sopc2dts_py.gui" = ["templates/*.html"]
 
 [tool.setuptools_scm]
