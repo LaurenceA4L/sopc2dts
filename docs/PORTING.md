@@ -270,6 +270,24 @@ Verified with a real Quartus 25.1 Agilex7 GHRD project (`a7-ghrd-project-orig`).
 - `tests/fixtures/a7_system.sopcinfo`: real Agilex7 GHRD sopcinfo from Quartus 25.1.
 - `tests/integration/test_a7_integration.py`: 15 integration tests, all passing.
 
+**A7 component coverage (new entries):**
+
+| Component | Status | Notes |
+|---|---|---|
+| `intel_agilex_hps` | ignore ✓ | HPS toplevel; no direct DTS node. Connections from other ignored components suppressed at debug level. |
+| `intel_agilex_interface_generator` | handler ✓ | Moves EMAC signal interfaces to HPS EMAC sub-components before generation (mirrors A10 pattern). |
+| `altera_emif_cal` | ignore ✓ | EMIF calibration core; no DTS representation. |
+| `altera_emif_fm_hps` | ignore ✓ | EMIF fabric-to-HPS bridge; no DTS representation. |
+| `hps_response_timer` | ignore ✓ | HPS response timer; no DTS representation. |
+| `altera_s10_user_rst_clkgate` | ignore ✓ | User reset/clock gate; no DTS representation. |
+| `intel_cache_coherency_translator` | ignore ✓ | Cache coherency bridge; no DTS representation. |
+| `intel_pcie_ptile_mcdma` | ignore ✓ | P-Tile PCIe + MCDMA. Fabric-only in A7 GHRD (no HPS Avalon-MM access); no HPS DTS node needed. |
+| `altera_reset_bridge` | ignore ✓ | Reset domain crossing bridge; no DTS representation. |
+| `arm_a9` | ignore ✓ | ARM placeholder sub-component; no DTS representation. |
+| `hps_virt_clk` | ignore ✓ | Virtual clock placeholder; no DTS representation. |
+| `falconmesa_arm_gic` | ignore ✓ | GIC-400 internal; real interrupt controller handled via `arm_gic,falconmesa_arm_gic` combined class name. |
+| `falconmesa_hps_bridge_avalon` | ignore ✓ | Internal HPS bridge; no DTS representation. |
+
 ### Phase 5B — Agilex5 (pending)
 
 Agilex5 is a **breaking** change relative to all prior families:

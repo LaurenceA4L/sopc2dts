@@ -256,8 +256,12 @@ def _resolve_intf(
         return None, None
     intf = comp.get_interface_by_name(ref[dot + 1:])
     if intf is None:
-        logger.warning("Connection references unknown interface %r on %r",
-                       ref[dot + 1:], ref[:dot])
+        # Connections to/from ignored components are discarded anyway — debug only.
+        level = "debug" if (comp.scd and comp.scd.group == "ignore") else "warning"
+        getattr(logger, level)(
+            "Connection references unknown interface %r on %r",
+            ref[dot + 1:], ref[:dot],
+        )
         return None, None
     return comp, intf
 

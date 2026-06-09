@@ -1,0 +1,8 @@
+<BoardInfo pov="hps">
+<Memory>
+    <Node chip="ocm"></Node>
+</Memory>
+<Chosen>
+    <Bootargs val="console=ttyS0,115200 earlycon"></Bootargs>
+</Chosen>
+</BoardInfo>
