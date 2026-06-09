@@ -111,6 +111,19 @@
 	<S2DComponent classname="altera_hps_io" group="ignore"></S2DComponent>
 	<S2DComponent classname="altera_arria10_hps_io" group="ignore"></S2DComponent>
 	<S2DComponent classname="altera_emif_a10_hps" group="ignore"></S2DComponent>
+	<!-- Agilex 7 / Stratix 10 HPS and system-level components -->
+	<S2DComponent classname="intel_agilex_hps" group="ignore" />
+	<S2DComponent classname="intel_agilex_interface_generator" group="interfaces" />
+	<S2DComponent classname="altera_emif_cal" group="ignore" />
+	<S2DComponent classname="altera_emif_fm_hps" group="ignore" />
+	<S2DComponent classname="hps_response_timer" group="ignore" />
+	<S2DComponent classname="altera_s10_user_rst_clkgate" group="ignore" />
+	<S2DComponent classname="intel_cache_coherency_translator" group="ignore" />
+	<S2DComponent classname="intel_pcie_ptile_mcdma" group="ignore" />
+	<S2DComponent classname="arm_a9" group="ignore" />
+	<S2DComponent classname="hps_virt_clk" group="ignore" />
+	<S2DComponent classname="falconmesa_arm_gic" group="ignore" />
+	<S2DComponent classname="falconmesa_hps_bridge_avalon" group="ignore" />
 	<S2DComponent classname="altera_jtag_avalon_master" group="remove"></S2DComponent>
 	<S2DComponent classname="altera_irq_bridge" group="ignore"/>
 	<S2DComponent classname="intr_capturer" group="remove"></S2DComponent>
@@ -224,4 +237,68 @@
 	<S2DComponent classname="altera_pcie_av_hip_avmm" group="pcie_mm" compatDevice="pcie-mm-arriaV">
 		<CompatibleVersion value="12.1"></CompatibleVersion>
 	</S2DComponent>
+
+	<S2DComponent classname="sysid_qsys" group="sysid" compatDevice="sysid">
+		<CompatibleVersion value="1.0" />
+		<parameter dtsName="id" sopcName="id" />
+		<parameter dtsName="timestamp" sopcName="timestamp" />
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_avalon_tse_mac" group="ethernet" compatDevice="emac">
+		<CompatibleVersion value="1.0" />
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_avalon_epcs_flash_controller" group="flash">
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_avalon_i2c" group="i2c" compatDevice="i2c">
+		<CompatibleVersion value="1.0" />
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_generic_tristate_controller" group="flash">
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_mailbox_std" group="mailbox" compatDevice="mailbox">
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_avalon_sysid_qsys,altera_avalon_sysid" group="sysid" compatDevice="sysid">
+		<CompatibleVersion value="1.0" />
+		<parameter dtsName="id" sopcName="id" />
+		<parameter dtsName="timestamp" sopcName="timestamp" />
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_i2c" group="i2c" compatDevice="i2c">
+		<CompatibleVersion value="1.0" />
+	</S2DComponent>
+	
+	<S2DComponent classname="arm_gic,falconmesa_arm_gic" group="interrupt-controller">
+	</S2DComponent>
+	
+	<S2DComponent classname="lw_h2f_hps_bridge_avalon,h2f_hps_bridge_avalon,f2h_hps_bridge_avalon,lw_h2f_hps_bridge_avalon_classic" group="bridge" compatDevice="avalon">
+		<compatible name="simple-bus" />
+	</S2DComponent>
+	
+	<S2DComponent classname="baum_clkmgr" group="clkmgr" compatDevice="clkmgr">
+	</S2DComponent>
+	
+	<S2DComponent classname="altera_a10_clkmgr" group="clkmgr" compatDevice="clkmgr">
+	</S2DComponent>
+	
+	<S2DComponent classname="cyclonev_clkmgr,cyclone5_clkmgr" group="clkmgr" compatDevice="clkmgr">
+	</S2DComponent>
+	
+	<S2DComponent classname="dw_gpio" group="gpio" compatDevice="gpio">
+		<CompatibleVersion value="1.0" />
+	</S2DComponent>
+	
+	<S2DComponent classname="labx_ethernet" group="ethernet" compatDevice="labx-ethernet">
+	</S2DComponent>
+	
+	<S2DComponent classname="interrupt_latency_counter" group="remove">
+	</S2DComponent>
+	
+	<S2DComponent classname="alt_vip_switch" group="vip" compatDevice="vip-video-mixer">
+		<CompatibleVersion value="1.0" />
+	</S2DComponent>
+	
 </SOPC2DTS_COMPONENTLIB>

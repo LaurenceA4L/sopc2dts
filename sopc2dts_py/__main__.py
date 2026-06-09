@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-i", "--input",
         dest="input",
         metavar="sopcinfo_file",
-        help="The sopcinfo or .qsys input file (optional in --gui mode)",
+        help="The sopcinfo or .qsys input file",
     )
     p.add_argument(
         "-o", "--output",
@@ -195,13 +195,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Try to behave like sopc-create-header-files",
     )
     p.add_argument(
-        "-g", "--gui",
-        dest="gui",
-        action="store_true",
-        default=False,
-        help="Run in GUI mode (opens browser)",
-    )
-    p.add_argument(
         "-v", "--verbose",
         dest="verbose",
         action="count",
@@ -223,12 +216,9 @@ def main() -> None:
 
     setup_logging(args.verbose)
 
-    if args.gui:
-        _run_gui(args)
-        return
 
     if not args.input:
-        parser.error("--input is required unless running in --gui mode")
+        parser.error("--input is required")
 
     _run_cli(args)
 
@@ -406,16 +396,3 @@ def _run_cli(args) -> None:
             sys.stdout.write(output)
 
 
-def _run_gui(args) -> None:
-    try:
-        from .gui.launcher import launch
-    except ImportError:
-        logger.error(
-            "GUI dependencies not installed. Run: pip install sopc2dts[gui]"
-        )
-        sys.exit(1)
-    launch(input_file=args.input or "")
-
-
-if __name__ == "__main__":
-    main()

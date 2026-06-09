@@ -251,45 +251,43 @@ Goal: `sopc2dts --gui` opens a functional browser UI equivalent to the Swing GUI
 
 Goal: modernise component coverage for current Intel/Altera toolchain output.
 
-> Note: Quartus Pro `.qsys` format for Agilex differs from legacy Cyclone V / Arria 10.  
-> Confirm exact differences from Intel docs before starting this phase.
+### Phase 5A — Agilex7 (complete ✅)
 
-- [ ] Audit `.qsys` format differences for Agilex7 vs Arria 10
-- [ ] Update `parsers/qsys.py` for any schema changes
-- [ ] Add Agilex7 HPS component handlers (new IP blocks, updated compatibles)
-- [ ] Add Agilex5 HPS component handlers
-- [ ] Update DTS `compatible` strings for Agilex SoC family
-- [ ] Test against real Agilex7 `.sopcinfo` / `.qsys` files
-- [ ] Test against real Agilex5 `.sopcinfo` / `.qsys` files
+Verified with a real Quartus 25.1 Agilex7 GHRD project (`a7-ghrd-project-orig`).
 
----
+**Key findings:**
 
-## Phase 6 — cheby Integration (future)
+- `.sopcinfo` XML format is unchanged from Cyclone V / Arria 10 — no parser changes needed.
+- New HPS class name: `intel_agilex_hps` (replaces `altera_arria10_hps`).
+- Interface generator: `intel_agilex_interface_generator` (mirrors A10 pattern; moves EMAC interfaces to HPS EMAC sub-components).
+- Agilex7 is **evolutionary** from Stratix 10/Arria 10: Cortex-A53 cluster, GIC-400, 32-bit SoC address space. Most DTS compatible strings carry over (`altr,socfpga-stmmac-a10-s10` for Ethernet, `intel,agilex-clkmgr` for clock manager).
 
-Goal: GUI becomes a unified front-end for sopc2dts + cheby register tooling.
+**Changes made:**
 
-> Deferred until Phases 1–4 are complete and stable.
+- `sopc_components_altera.xml`: added `intel_agilex_hps`, `intel_agilex_interface_generator`, `altera_emif_cal`, `altera_emif_fm_hps`, `hps_response_timer`, `altera_s10_user_rst_clkgate`, `intel_cache_coherency_translator`, `intel_pcie_ptile_mcdma`, `arm_a9`, `hps_virt_clk`, `falconmesa_arm_gic`, `falconmesa_hps_bridge_avalon`.
+- `sopc2dts_py/components/altera/AgilexInterfaceGenerator.py`: new handler for `intel_agilex_interface_generator`.
+- `sopc2dts_py/model/component_lib.py`: dispatch case for `intel_agilex_interface_generator`.
+- `tests/fixtures/a7_system.sopcinfo`: real Agilex7 GHRD sopcinfo from Quartus 25.1.
+- `tests/integration/test_a7_integration.py`: 15 integration tests, all passing.
 
-- [ ] Design shared data model between sopc2dts component map and cheby register map
-- [ ] Add cheby input panel to web GUI
-- [ ] Cross-link: sopc2dts component address → cheby register block
-- [ ] Unified DTS + register header generation workflow
-- [ ] Export: combined `.dts` + `.yaml` / `.h` output
+### Phase 5B — Agilex5 (pending)
 
----
+Agilex5 is a **breaking** change relative to all prior families:
 
-## Reference Files
+- **CPU**: Cortex-A55 + Cortex-A76 big.LITTLE cluster (not A53).
+- **GIC**: GIC-v3 (`arm,gic-v3`) — different register layout from GIC-400.
+- **Address space**: 64-bit — `#address-cells = <2>` in DTS.
+- **Ethernet**: XGMAC (`snps,dwxgmac-2.10`) replaces TSE/STMMAC.
+- **DMA**: AXI DMA (not PL330).
+- **I3C** replaces I2C on some buses; different NAND controller.
 
-| File | Purpose |
-|------|---------|
-| `Sopc2DTS.java` | CLI entry point, option parsing |
-| `sopc2dts/parsers/sopcinfo/SopcInfoSystemLoader.java` | Main input parser |
-| `sopc2dts/parsers/qsys/QSysSystemLoader.java` | Qsys input parser |
-| `sopc2dts/lib/AvalonSystem.java` | Core system model |
-| `sopc2dts/lib/BoardInfo.java` | Board overlay model |
-| `sopc2dts/lib/devicetree/*.java` | DT data model |
-| `sopc2dts/generators/DTSGenerator2.java` | Primary DTS text output |
-| `sopc2dts/generators/DTBGenerator2.java` | DTB binary output |
-| `sopc2dts/gui/Sopc2DTSGui.java` | Swing GUI shell |
-| `sopc_components_*.xml` | Component library definitions |
-| `boardinfo_neek.xml` | Example boardinfo file (test fixture) |
+64-bit address-cell support in the DTS generator is the main prerequisite.
+
+- [ ] Obtain real Agilex5 `.sopcinfo` / `.qsys` fixture
+- [ ] Add 64-bit `#address-cells` support to DTS generator
+- [ ] Add `intel_agilex5_hps` and associated interface generator class names
+- [ ] Add GIC-v3 handler (`arm,gic-v3` compatible)
+- [ ] Add XGMAC Ethernet handler (`snps,dwxgmac-2.10`)
+- [ ] Update `sopc_components_altera.xml` for Agilex5 IP blocks
+- [ ] Integration tests against real Agilex5 project
+

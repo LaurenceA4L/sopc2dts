@@ -229,6 +229,9 @@ class SopcComponentLib:
         elif cn == "altera_arria10_interface_generator":
             from ..components.altera.A10InterfaceGenerator import A10InterfaceGenerator
             return A10InterfaceGenerator(class_name, instance_name, version, scd)
+        elif cn == "intel_agilex_interface_generator":
+            from ..components.altera.AgilexInterfaceGenerator import AgilexInterfaceGenerator
+            return AgilexInterfaceGenerator(class_name, instance_name, version, scd)
         elif cn == "altera_irq_bridge":
             from ..components.altera.InterruptBridge import InterruptBridge
             return InterruptBridge(class_name, instance_name, version, scd)
