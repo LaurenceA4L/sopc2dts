@@ -41,6 +41,6 @@ class SICGpioController(BasicComponent):
     def to_dt_node(self, board_info: object, conn: Optional["Connection"]) -> object:
         from ...model.devicetree import DTProperty  # type: ignore[attr-defined]
         node = super().to_dt_node(board_info, conn)
-        node.add_property(DTProperty("#gpio-cells", 2))
+        node.add_property(DTProperty.from_long("#gpio-cells", 2))
         node.add_property(DTProperty("gpio-controller"))
         return node

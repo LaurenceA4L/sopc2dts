@@ -44,6 +44,7 @@ class DTPropType(Enum):
     BYTE   = auto()
     BOOL   = auto()
     PHANDLE = auto()
+    BAREREF = auto()
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +180,29 @@ class DTPropPHandleVal(DTPropVal):
 
     def get_value_bytes(self) -> bytes:
         return struct.pack(">I", self.phandle & 0xFFFFFFFF)
+
+    def value_str(self) -> str:
+        return f"&{self.label}"
+
+
+class DTPropBareRefVal(DTPropVal):
+    """
+    Bare label reference used as a whole property value — ``foo = &label;``
+    (no enclosing ``<...>``), a dtc source-level convenience most commonly
+    seen in ``aliases`` nodes. Unlike ``DTPropPHandleVal`` (a phandle *cell*,
+    always written inside ``<...>``), this renders with no brackets at all;
+    it is dtc's own job to expand it to the referenced node's path at
+    compile time, so we simply pass the ``&label`` text through unchanged.
+    """
+
+    def __init__(self, label: str) -> None:
+        super().__init__(DTPropType.BAREREF, "", "", "")
+        self.label = label
+
+    def get_value_bytes(self) -> bytes:
+        # Never compiled to a DTB directly by this tool; dtc resolves and
+        # expands bare references to a path string at its own compile time.
+        return f"&{self.label}".encode("utf-8") + b"\x00"
 
     def value_str(self) -> str:
         return f"&{self.label}"
@@ -351,6 +375,18 @@ class DTNode(DTElement):
     def add_child(self, child: "DTNode") -> None:
         if child is not None:
             self._children.append(child)
+
+    def remove_child(self, child: "DTNode") -> None:
+        """Remove a child from this node (no-op if not present)."""
+        try:
+            self._children.remove(child)
+        except ValueError:
+            pass
+
+    def replace_child(self, old: "DTNode", new: "DTNode") -> None:
+        """Replace ``old`` with ``new`` in place, preserving child order."""
+        idx = self._children.index(old)
+        self._children[idx] = new
 
     @property
     def children(self) -> List["DTNode"]:
